@@ -319,8 +319,8 @@ Deno.serve(async (request: Request) => {
 
   let query = admin.from("loan_applications")
     .select("*")
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
     .range(offset, offset + PAGE_SIZE);
   if (status === "archived") query = query.not("archived_at", "is", null);
   else {

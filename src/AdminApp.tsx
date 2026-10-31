@@ -118,6 +118,11 @@ export default function AdminApp() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState('')
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
+
+  useEffect(() => () => {
+    if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl)
+  }, [pdfPreviewUrl])
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -341,6 +346,16 @@ export default function AdminApp() {
     return files
   }
 
+  const createSelectedApplicationPdf = async () => {
+    if (!selected) throw new Error('Elegí una solicitud para continuar.')
+    const { buildApplicationPdf, downloadApplicationFile, safeFilename } = await import('./lib/application-export')
+    const application = await getFreshApplication(selected.id)
+    const attachments = await getAttachments(application, downloadApplicationFile)
+    const pdf = await buildApplicationPdf(application, attachments, `${import.meta.env.BASE_URL}prestamos-variety-logo.jpg`)
+    const filename = `Solicitud-${safeFilename(application.full_name)}-${application.id.slice(0, 8)}.pdf`
+    return { blob: new Blob([pdf.buffer as ArrayBuffer], { type: 'application/pdf' }), filename }
+  }
+
   const downloadApplicationPdf = async () => {
     if (!selected || exporting) return
     setExporting(true)
@@ -348,12 +363,8 @@ export default function AdminApp() {
     setError('')
     setNotice('')
     try {
-      const { buildApplicationPdf, downloadApplicationFile, safeFilename } = await import('./lib/application-export')
-      const application = await getFreshApplication(selected.id)
-      const attachments = await getAttachments(application, downloadApplicationFile)
-      const pdf = await buildApplicationPdf(application, attachments, `${import.meta.env.BASE_URL}prestamos-variety-logo.jpg`)
-      const filename = `Solicitud-${safeFilename(application.full_name)}-${application.id.slice(0, 8)}.pdf`
-      downloadBlob(new Blob([pdf.buffer as ArrayBuffer], { type: 'application/pdf' }), filename)
+      const { blob, filename } = await createSelectedApplicationPdf()
+      downloadBlob(blob, filename)
       setNotice('El PDF de la solicitud, con sus adjuntos, se descargó correctamente.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo generar el PDF.')
@@ -361,6 +372,29 @@ export default function AdminApp() {
       setExporting(false)
       setExportProgress('')
     }
+  }
+
+  const previewApplicationPdf = async () => {
+    if (!selected || exporting) return
+    setExporting(true)
+    setExportProgress('Preparando la vista previa de la solicitud y sus archivos adjuntos…')
+    setError('')
+    setNotice('')
+    try {
+      const { blob } = await createSelectedApplicationPdf()
+      if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl)
+      setPdfPreviewUrl(URL.createObjectURL(blob))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo abrir la vista previa del PDF.')
+    } finally {
+      setExporting(false)
+      setExportProgress('')
+    }
+  }
+
+  const closePdfPreview = () => {
+    if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl)
+    setPdfPreviewUrl(null)
   }
 
   const toggleApplication = (id: string) => {
@@ -577,6 +611,14 @@ export default function AdminApp() {
           <button className="whatsapp-dismiss" onClick={() => { setWhatsAppApplicant(null); setWhatsAppNumber('') }}>Cerrar aviso</button>
         </section>
       )}
+      {pdfPreviewUrl && (
+        <div className="pdf-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closePdfPreview() }}>
+          <section className="pdf-preview-dialog" role="dialog" aria-modal="true" aria-label="Vista previa de la solicitud en PDF">
+            <header><b>Vista previa de la solicitud</b><button onClick={closePdfPreview} aria-label="Cerrar vista previa">×</button></header>
+            <iframe title="Solicitud en formato PDF" src={`${pdfPreviewUrl}#toolbar=0&navpanes=0`} />
+          </section>
+        </div>
+      )}
       <div className="admin-layout">
         <section className="admin-list" aria-label="Listado de solicitudes">
           <div className="admin-list-header"><b>{applications.length} solicitudes cargadas</b><button onClick={() => void loadApplications()} disabled={loading}>Actualizar</button></div>
@@ -617,6 +659,10 @@ export default function AdminApp() {
                 <div><span className={'status-badge status-' + selected.status}>{statusLabel[selected.status] || selected.status}</span>{selected.archived_at && <span className="archived-badge">Archivada</span>}<h2>{selected.full_name}</h2><p>Solicitud {selected.id} · {new Date(selected.created_at).toLocaleString('es-AR')}</p></div>
                 <div className="detail-header-actions">
                   <button className="archive-button" onClick={() => void setApplicationArchived(!selected.archived_at)} disabled={loading}>{selected.archived_at ? 'Restaurar' : 'Archivar'}</button>
+                  <button className="pdf-preview-button" onClick={() => void previewApplicationPdf()} disabled={exporting} aria-label="Ver solicitud como PDF" title="Ver solicitud como PDF">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <span>Ver PDF</span>
+                  </button>
                   <button className="pdf-download-button" onClick={() => void downloadApplicationPdf()} disabled={exporting} aria-label={exporting ? 'Preparando PDF' : 'Descargar PDF de esta solicitud'} title={exporting ? 'Preparando PDF' : 'Descargar PDF de esta solicitud'}>
                     <img className="download-logo" src={`${import.meta.env.BASE_URL}prestamos-variety-logo.jpg`} alt="" aria-hidden="true" />
                   </button>
