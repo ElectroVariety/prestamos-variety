@@ -678,9 +678,6 @@ body { background: var(--brand-pearl); color: var(--brand-graphite); }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline-color: var(--brand-electric); }
 @media (max-width: 560px) { .brand-logo-frame { width:64px; height:64px; } .brand-header { gap: 10px; } .brand-name strong { letter-spacing: .035em; } }
 
-.whatsapp-consent { display:flex; align-items:flex-start; gap:10px; margin:14px 0; padding:13px 14px; border:1px solid var(--brand-silver); border-radius:10px; background:#fff; color:var(--brand-graphite); font-size:13px; line-height:1.5; }
-.whatsapp-consent input { flex:none; width:18px; height:18px; margin:2px 0 0; accent-color:var(--brand-blue-deep); }
-.whatsapp-consent span { display:block; }
 
 .status-nav-link { margin-left:auto; border:1px solid var(--brand-silver); border-radius:9px; padding:10px 13px; background:#fff; color:#005da8; font-size:12px; font-weight:700; text-decoration:none; white-space:nowrap; }
 .status-nav-link:hover { border-color:var(--brand-electric); background:var(--brand-blue-soft); }

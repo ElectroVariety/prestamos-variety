@@ -242,7 +242,6 @@ function App() {
   const [loanFrequency, setLoanFrequency] =
     useState<LoanFrequency>('weekly')
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
-  const [whatsappRejectionConsent, setWhatsappRejectionConsent] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File[]>>({})
   const [uploadResetKey, setUploadResetKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -380,7 +379,6 @@ function App() {
       total_to_pay: selectedPlan.installments * selectedPlan.amount,
       loan_purpose: value('loan_purpose'),
       privacy_accepted: privacyAccepted,
-      whatsapp_rejection_opt_in: whatsappRejectionConsent,
       tracking_code_requested: true,
     }
 
@@ -1031,17 +1029,6 @@ function App() {
               Declaro que la información proporcionada es verdadera y acepto
               el tratamiento de mis datos para evaluar mi solicitud, según la
               política de privacidad. *
-            </span>
-          </label>
-
-          <label className="whatsapp-consent">
-            <input
-              type="checkbox"
-              checked={whatsappRejectionConsent}
-              onChange={(event) => setWhatsappRejectionConsent(event.target.checked)}
-            />
-            <span>
-              Acepto recibir por WhatsApp una notificación sobre el resultado de mi solicitud desde un número de Préstamos Variety.
             </span>
           </label>
 
