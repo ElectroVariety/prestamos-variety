@@ -64,7 +64,7 @@ export default function StatusLookup({ initialCode }: { initialCode?: string | n
             maxLength={44}
             value={code}
             onChange={(event) => setCode(event.target.value)}
-            placeholder="PV-AB12-CD34-…"
+            placeholder="ABC-123-XYZ"
             required
           />
           <button className="status-lookup-submit" type="submit" disabled={loading}>{loading ? 'Consultando…' : 'Consultar'}</button>

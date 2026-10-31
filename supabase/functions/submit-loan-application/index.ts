@@ -56,13 +56,13 @@ function numberField(value: unknown): number | null {
 }
 
 async function createTrackingCode() {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  const randomPart = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
-  const canonical = `PV${randomPart}`;
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(9));
+  const canonical = Array.from(bytes, (byte) => alphabet[byte & 31]).join("");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
   const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-  const groups = randomPart.match(/.{1,4}/g) ?? [];
-  return { code: `PV-${groups.join("-")}`, hash };
+  const groups = canonical.match(/.{1,3}/g) ?? [];
+  return { code: groups.join("-"), hash };
 }
 
 function safeFilename(name: string) {

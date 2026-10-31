@@ -50,7 +50,9 @@ Deno.serve(async (request: Request) => {
   }
 
   const rawCode = typeof body.code === "string" ? body.code.trim().toUpperCase().replace(/[\s-]/g, "") : "";
-  if (!/^PV[0-9A-F]{32}$/.test(rawCode)) {
+  const isCurrentCode = /^[A-HJ-NP-Z2-9]{9}$/.test(rawCode);
+  const isPreviouslyIssuedCode = /^PV[0-9A-F]{32}$/.test(rawCode);
+  if (!isCurrentCode && !isPreviouslyIssuedCode) {
     return respond({ success: false, error: "El código ingresado no es válido." }, 400, origin);
   }
 
