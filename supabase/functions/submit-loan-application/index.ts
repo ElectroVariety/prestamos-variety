@@ -55,6 +55,16 @@ function numberField(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+async function createTrackingCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const randomPart = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
+  const canonical = `PV${randomPart}`;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const groups = randomPart.match(/.{1,4}/g) ?? [];
+  return { code: `PV-${groups.join("-")}`, hash };
+}
+
 function safeFilename(name: string) {
   const base = name.split(/[\\/]/).pop() ?? "documento";
   return base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120) || "documento";
@@ -124,6 +134,10 @@ Deno.serve(async (req: Request) => {
     body = parsed as Record<string, unknown>;
   } catch {
     return respond({ error: "Los datos de la solicitud no tienen un formato válido." }, 400, origin);
+  }
+  const trackingCodeRequested = body.tracking_code_requested === true;
+  if (body.tracking_code_requested !== undefined && typeof body.tracking_code_requested !== "boolean") {
+    return respond({ error: "La opción del código de seguimiento no es válida." }, 400, origin);
   }
 
   const fullName = textField(body, "full_name", 150, true);
@@ -378,8 +392,9 @@ Deno.serve(async (req: Request) => {
   let applicationId: string | null = null;
   const uploadedPaths: string[] = [];
   try {
+    const tracking = trackingCodeRequested ? await createTrackingCode() : null;
     const { data: saved, error: appError } = await supabase
-      .from("loan_applications").insert(application).select("id").single();
+      .from("loan_applications").insert({ ...application, tracking_code_hash: tracking?.hash ?? null }).select("id").single();
     if (appError?.code === "P0001" && appError.message === "DNI_APPLICATION_PREVIOUSLY_REJECTED") {
       return respond({
         success: false,
@@ -424,7 +439,12 @@ Deno.serve(async (req: Request) => {
       if (docsError) throw new Error(`No se pudieron registrar los documentos: ${docsError.message}`);
     }
 
-    return respond({ success: true, message: "La solicitud y sus documentos se guardaron correctamente.", application_id: applicationId }, 201, origin);
+    return respond({
+      success: true,
+      message: "La solicitud y sus documentos se guardaron correctamente.",
+      application_id: applicationId,
+      ...(tracking ? { tracking_code: tracking.code } : {}),
+    }, 201, origin);
   } catch (error) {
     console.error("Error procesando solicitud:", error instanceof Error ? error.message : error);
     if (uploadedPaths.length) {

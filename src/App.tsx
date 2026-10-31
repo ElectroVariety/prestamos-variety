@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
 import { supabase } from './lib/supabase'
+import StatusLookup from './StatusLookup'
 import './App.css'
 
 type IncomeType =
@@ -248,6 +249,8 @@ function App() {
   const [showRequiredErrors, setShowRequiredErrors] = useState(false)
   const [submitMessage, setSubmitMessage] = useState('')
   const [submitError, setSubmitError] = useState('')
+  const [trackingCode, setTrackingCode] = useState<string | null>(null)
+  const [trackingCodeCopied, setTrackingCodeCopied] = useState(false)
 
   const selectedPlan = loanPlans[loanAmount][loanFrequency]
 
@@ -378,6 +381,7 @@ function App() {
       loan_purpose: value('loan_purpose'),
       privacy_accepted: privacyAccepted,
       whatsapp_rejection_opt_in: whatsappRejectionConsent,
+      tracking_code_requested: true,
     }
 
     const body = new FormData()
@@ -405,7 +409,12 @@ function App() {
       if (!data || data.success !== true) {
         throw new Error(data?.error || 'El servidor no confirmó el registro de la solicitud.')
       }
-      setSubmitMessage('La solicitud se envió correctamente.')
+      if (typeof data.tracking_code !== 'string') {
+        throw new Error('La solicitud se guardó, pero no se recibió su código. Contactanos para obtener ayuda.')
+      }
+      setTrackingCode(data.tracking_code)
+      setTrackingCodeCopied(false)
+      setSubmitMessage('La solicitud se envió correctamente. Guardá este código para consultar su estado.')
       setShowRequiredErrors(false)
       form.reset()
       setSelectedFiles({})
@@ -443,6 +452,7 @@ function App() {
           <span>PRÉSTAMOS PERSONALES</span>
         </div>
         <span className="secure-label">Solicitud online</span>
+        <a className="status-nav-link" href="#consultar-estado">Consultar estado</a>
       </header>
 
       <div className="hero">
@@ -1038,7 +1048,18 @@ function App() {
         </section>
 
         {submitError && <p className="form-error" role="alert">{submitError}</p>}
-        {submitMessage && <p className="form-success" role="status">{submitMessage}</p>}
+        {submitMessage && <div className="form-success tracking-success" role="status">
+          <p>{submitMessage}</p>
+          {trackingCode && <div className="tracking-code-card">
+            <span>Código de seguimiento</span>
+            <strong>{trackingCode}</strong>
+            <button type="button" onClick={() => {
+              void navigator.clipboard.writeText(trackingCode).then(() => setTrackingCodeCopied(true)).catch(() => setTrackingCodeCopied(false))
+            }}>{trackingCodeCopied ? 'Copiado' : 'Copiar código'}</button>
+            <small>Guardalo en un lugar privado. Cualquier persona que tenga el código podrá consultar el estado.</small>
+            <a href="#consultar-estado">Consultar estado ahora ↓</a>
+          </div>}
+        </div>}
 
         <button className="submit-button" type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Enviando solicitud…' : 'Enviar solicitud'}
@@ -1049,6 +1070,8 @@ function App() {
           La presentación de la solicitud no garantiza la aprobación del préstamo.
         </p>
       </form>
+
+      <StatusLookup initialCode={trackingCode} />
 
       <footer className="site-footer">
         <span className="logo-frame footer-logo-frame">

@@ -347,7 +347,8 @@ Deno.serve(async (request: Request) => {
         if (error || !data) throw new Error("No se pudo preparar el acceso temporal a un documento.");
         return { id: document.id, document_type: document.document_type, original_filename: document.original_filename, file_size_bytes: document.file_size_bytes, signed_url: data.signedUrl };
       }));
-      return { ...application, incomes: incomeResult.data ?? [], documents };
+      const { tracking_code_hash: _trackingCodeHash, ...safeApplication } = application;
+      return { ...safeApplication, incomes: incomeResult.data ?? [], documents };
     }));
     return respond({ success: true, applications: results, has_more: hasMore, next_offset: offset + results.length }, 200, origin);
   }

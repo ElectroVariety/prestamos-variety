@@ -681,3 +681,40 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .whatsapp-consent { display:flex; align-items:flex-start; gap:10px; margin:14px 0; padding:13px 14px; border:1px solid var(--brand-silver); border-radius:10px; background:#fff; color:var(--brand-graphite); font-size:13px; line-height:1.5; }
 .whatsapp-consent input { flex:none; width:18px; height:18px; margin:2px 0 0; accent-color:var(--brand-blue-deep); }
 .whatsapp-consent span { display:block; }
+
+.status-nav-link { margin-left:auto; border:1px solid var(--brand-silver); border-radius:9px; padding:10px 13px; background:#fff; color:#005da8; font-size:12px; font-weight:700; text-decoration:none; white-space:nowrap; }
+.status-nav-link:hover { border-color:var(--brand-electric); background:var(--brand-blue-soft); }
+.tracking-success { display:grid; gap:10px; }
+.tracking-success>p { margin:0; }
+.tracking-code-card { display:grid; gap:7px; justify-items:start; padding:15px; border:1px solid #9dccf2; border-radius:11px; background:#f1f8ff; color:var(--brand-graphite); }
+.tracking-code-card>span { color:#5e6978; font-size:12px; }
+.tracking-code-card>strong { color:#005da8; font-size:20px; letter-spacing:.08em; overflow-wrap:anywhere; }
+.tracking-code-card>button { border:1px solid #006fc6; border-radius:8px; padding:8px 12px; background:#006fc6; color:#fff; font-weight:700; cursor:pointer; }
+.tracking-code-card>small { color:#5e6978; font-size:11px; line-height:1.45; }
+.tracking-code-card>a { color:#005da8; font-size:12px; font-weight:700; }
+.status-lookup { display:grid; gap:13px; margin:25px 0 18px; padding:20px; border:1px solid var(--brand-silver); border-radius:14px; background:#fff; }
+.status-lookup-heading { display:flex; align-items:center; gap:11px; }
+.status-lookup-heading h2 { margin:0 0 3px; font-size:17px; }
+.status-lookup-heading p { margin:0; color:#5e6978; font-size:12px; }
+.status-lookup>form { display:grid; gap:7px; }
+.status-lookup>form>label { color:var(--brand-graphite); font-size:12px; font-weight:700; }
+.status-lookup-controls { display:flex; gap:8px; }
+.status-lookup-controls input { flex:1; min-width:0; border:1px solid var(--brand-silver); border-radius:8px; padding:11px 12px; color:var(--brand-graphite); font:inherit; text-transform:uppercase; }
+.status-lookup-submit { border:0; border-radius:8px; padding:10px 16px; background:#006fc6; color:#fff; font-weight:700; cursor:pointer; }
+.status-lookup-submit:disabled { opacity:.6; cursor:wait; }
+.status-lookup-error { margin:0; border-radius:8px; padding:10px 12px; background:#fff0f0; color:#a43c3c; font-size:12px; }
+.status-lookup-result { display:grid; justify-items:start; gap:6px; border-radius:10px; padding:12px; background:#f4f7fa; }
+.status-lookup-result p { margin:0; color:var(--brand-graphite); font-size:12px; }
+.status-lookup-result small { color:#5e6978; font-size:11px; }
+.status-lookup-badge { border-radius:50px; padding:5px 9px; background:#fff2dc; color:#925c08; font-size:12px; font-weight:700; }
+.status-lookup-badge.status-under_review { background:#edf3ff; color:#365da0; }
+.status-lookup-badge.status-approved { background:#e9f6ed; color:#237445; }
+.status-lookup-badge.status-rejected { background:#fceeee; color:#a43c3c; }
+
+@media (max-width:560px) {
+  .status-nav-link { margin-left:0; padding:8px 9px; font-size:11px; }
+  .tracking-code-card>strong { font-size:16px; letter-spacing:.05em; }
+  .status-lookup { padding:15px; }
+  .status-lookup-controls { align-items:stretch; flex-direction:column; }
+  .status-lookup-submit { min-height:42px; }
+}
