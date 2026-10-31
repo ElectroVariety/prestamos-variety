@@ -5,7 +5,7 @@ export type ExportDocument = {
   document_type: string
   original_filename: string
   file_size_bytes: number
-  signed_url: string
+  signed_url: string | null
 }
 
 export type ExportIncome = Record<string, unknown>
@@ -221,6 +221,7 @@ async function videoPreview(bytes: Uint8Array, filename: string) {
 }
 
 export async function downloadApplicationFile(document: ExportDocument): Promise<Uint8Array> {
+  if (!document.signed_url) throw new Error(`No se pudo abrir "${document.original_filename}". Actualizá la lista e intentá nuevamente.`)
   const response = await fetch(document.signed_url)
   if (!response.ok) throw new Error(`No se pudo descargar "${document.original_filename}". Actualizá la lista e intentá nuevamente.`)
   return new Uint8Array(await response.arrayBuffer())

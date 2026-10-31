@@ -9,6 +9,19 @@ const origins = new Set([
 ]);
 const baseHeaders = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Vary": "Origin" };
 
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index]);
+    }
+  }));
+  return results;
+}
+
 function respond(body: Record<string, unknown>, status: number, origin: string) {
   const headers = new Headers(baseHeaders);
   if (origins.has(origin)) headers.set("Access-Control-Allow-Origin", origin);
@@ -336,19 +349,29 @@ Deno.serve(async (request: Request) => {
   try {
     const pageApplications = applications ?? [];
     const hasMore = pageApplications.length > PAGE_SIZE;
-    const results = await Promise.all(pageApplications.slice(0, PAGE_SIZE).map(async (application) => {
+    const preparedApplications = await Promise.all(pageApplications.slice(0, PAGE_SIZE).map(async (application) => {
       const [incomeResult, docsResult] = await Promise.all([
         admin.from("loan_income_sources").select("*").eq("application_id", application.id),
         admin.from("loan_documents").select("id,document_type,storage_path,original_filename,file_size_bytes").eq("application_id", application.id),
       ]);
       if (incomeResult.error || docsResult.error) throw new Error("No se pudieron cargar los ingresos o los documentos asociados.");
-      const documents = await Promise.all((docsResult.data ?? []).map(async (document) => {
-        const { data, error } = await admin.storage.from(BUCKET).createSignedUrl(document.storage_path, 300);
-        if (error || !data) throw new Error("No se pudo preparar el acceso temporal a un documento.");
-        return { id: document.id, document_type: document.document_type, original_filename: document.original_filename, file_size_bytes: document.file_size_bytes, signed_url: data.signedUrl };
-      }));
       const { tracking_code_hash: _trackingCodeHash, ...safeApplication } = application;
-      return { ...safeApplication, incomes: incomeResult.data ?? [], documents };
+      return { application: safeApplication, incomes: incomeResult.data ?? [], rawDocuments: docsResult.data ?? [] };
+    }));
+    const allDocuments = preparedApplications.flatMap((item) => item.rawDocuments);
+    const signedDocuments = await mapWithConcurrency(allDocuments, 8, async (document) => {
+      const { data, error } = await admin.storage.from(BUCKET).createSignedUrl(document.storage_path, 300);
+      if (error || !data) {
+        console.warn("No se pudo preparar un enlace temporal para un documento; la lista continuará cargando.");
+        return { id: document.id, document_type: document.document_type, original_filename: document.original_filename, file_size_bytes: document.file_size_bytes, signed_url: null as string | null };
+      }
+      return { id: document.id, document_type: document.document_type, original_filename: document.original_filename, file_size_bytes: document.file_size_bytes, signed_url: data.signedUrl as string | null };
+    });
+    const signedDocumentById = new Map(signedDocuments.map((document) => [document.id, document]));
+    const results = preparedApplications.map((item) => ({
+      ...item.application,
+      incomes: item.incomes,
+      documents: item.rawDocuments.map((document) => signedDocumentById.get(document.id)!),
     }));
     return respond({ success: true, applications: results, has_more: hasMore, next_offset: offset + results.length }, 200, origin);
   }

@@ -10,7 +10,7 @@ type Document = {
   document_type: string
   original_filename: string
   file_size_bytes: number
-  signed_url: string
+  signed_url: string | null
 }
 
 type Application = ExportApplication & {
@@ -135,7 +135,19 @@ export default function AdminApp() {
 
   const callAdmin = useCallback(async (body: Record<string, string>) => {
     const { data, error: invokeError } = await supabase.functions.invoke('loan-admin-panel', { body })
-    if (invokeError) throw new Error(invokeError.message)
+    if (invokeError) {
+      let message = invokeError.message || 'No se pudo completar la operación.'
+      try {
+        const response = (invokeError as { context?: unknown }).context
+        if (response instanceof Response) {
+          const responseBody = await response.clone().json()
+          if (typeof responseBody?.error === 'string') message = responseBody.error
+        }
+      } catch {
+        // Conserva el mensaje del cliente si el servidor no devolvió JSON.
+      }
+      throw new Error(message)
+    }
     if (!data?.success) throw new Error(data?.error || 'No se pudo completar la operación.')
     return data
   }, [])
@@ -755,9 +767,15 @@ export default function AdminApp() {
               <div className="detail-subsection">
                 <h3>Documentación <span>{selected.documents.length}</span></h3>
                 {selected.documents.length ? selected.documents.map((document) => (
-                  <a className="document-row" key={document.id} href={document.signed_url} target="_blank" rel="noreferrer">
-                    <span>▧</span><span><b>{documentLabels[document.document_type] || document.document_type}</b><small>{document.original_filename} · {Math.max(1, Math.round(document.file_size_bytes / 1024))} KB</small></span><strong>Ver ↗</strong>
-                  </a>
+                  document.signed_url ? (
+                    <a className="document-row" key={document.id} href={document.signed_url} target="_blank" rel="noreferrer">
+                      <span>▧</span><span><b>{documentLabels[document.document_type] || document.document_type}</b><small>{document.original_filename} · {Math.max(1, Math.round(document.file_size_bytes / 1024))} KB</small></span><strong>Ver ↗</strong>
+                    </a>
+                  ) : (
+                    <div className="document-row" key={document.id} aria-label="Enlace temporal no disponible">
+                      <span>▧</span><span><b>{documentLabels[document.document_type] || document.document_type}</b><small>{document.original_filename} · {Math.max(1, Math.round(document.file_size_bytes / 1024))} KB · Actualizá para intentar de nuevo</small></span><strong>No disponible</strong>
+                    </div>
+                  )
                 )) : <p>No hay documentos cargados.</p>}
               </div>
               {(selected.decided_at || selected.decided_by || selected.admin_notes) && (
