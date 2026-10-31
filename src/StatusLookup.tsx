@@ -20,6 +20,11 @@ export default function StatusLookup({ initialCode }: { initialCode?: string | n
   const [result, setResult] = useState<StatusResult | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [deletionOpen, setDeletionOpen] = useState(false)
+  const [dniConfirmation, setDniConfirmation] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deletionError, setDeletionError] = useState('')
+  const [deleted, setDeleted] = useState(false)
 
   useEffect(() => {
     if (initialCode) setCode(initialCode)
@@ -45,6 +50,43 @@ export default function StatusLookup({ initialCode }: { initialCode?: string | n
     } finally {
       setLoading(false)
     }
+  }
+
+  const deleteRejectedData = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (result?.status !== 'rejected' || deleting) return
+    setDeleting(true)
+    setDeletionError('')
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('check-loan-status', {
+        body: { action: 'delete_rejected', code: code.trim(), dni: dniConfirmation },
+      })
+      if (invokeError) throw new Error(invokeError.message)
+      if (!data?.success || data.deleted !== true) throw new Error(data?.error || 'No se pudo completar la eliminación.')
+      setDeleted(true)
+      setResult(null)
+      setCode('')
+      setDniConfirmation('')
+      setDeletionOpen(false)
+    } catch (cause) {
+      setDeletionError(cause instanceof Error ? cause.message : 'No se pudo completar la eliminación. Intentá nuevamente.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  if (deleted) {
+    return (
+      <section id="consultar-estado" className="status-lookup status-deletion-complete" role="status">
+        <span className="deletion-success-icon" aria-hidden="true">✓</span>
+        <h2>Eliminación completada</h2>
+        <div className="deletion-progress" role="progressbar" aria-label="Eliminación completada" aria-valuemin={0} aria-valuemax={100} aria-valuenow={100}>
+          <span className="deletion-progress-complete" />
+        </div>
+        <p>Los datos personales, financieros y documentos de esta solicitud se eliminaron correctamente.</p>
+        <small>Se conserva una huella protegida no reversible del DNI únicamente para mantener el bloqueo de nuevas solicitudes tras el rechazo.</small>
+      </section>
+    )
   }
 
   return (
@@ -79,6 +121,26 @@ export default function StatusLookup({ initialCode }: { initialCode?: string | n
           {result.decided_at && <p>Decisión registrada el {formatDateTime(result.decided_at)}.</p>}
           <small>Por privacidad, esta consulta solo muestra el estado de la solicitud.</small>
         </div>
+      )}
+      {result?.status === 'rejected' && !deletionOpen && (
+        <button className="request-data-deletion" type="button" onClick={() => { setDeletionError(''); setDeletionOpen(true) }}>
+          Eliminar los datos de esta solicitud
+        </button>
+      )}
+      {result?.status === 'rejected' && deletionOpen && (
+        <form className="delete-data-form" onSubmit={(event) => void deleteRejectedData(event)}>
+          <h3>Confirmar eliminación</h3>
+          <p>Se eliminarán permanentemente los datos personales, financieros y documentos de esta solicitud. Para confirmar, ingresá el DNI asociado.</p>
+          <label htmlFor="deletion-dni">DNI de la solicitud</label>
+          <input id="deletion-dni" type="text" inputMode="numeric" autoComplete="off" value={dniConfirmation} onChange={(event) => setDniConfirmation(event.target.value)} required disabled={deleting} />
+          {deleting && <div className="deletion-progress" role="progressbar" aria-label="Eliminando datos de la solicitud"><span className="deletion-progress-running" /></div>}
+          {deletionError && <p className="status-lookup-error" role="alert">{deletionError}</p>}
+          <small>Se conservará únicamente una huella protegida no reversible del DNI para mantener el bloqueo de nuevas solicitudes tras el rechazo.</small>
+          <div className="delete-data-actions">
+            <button type="button" className="delete-data-cancel" onClick={() => setDeletionOpen(false)} disabled={deleting}>Cancelar</button>
+            <button type="submit" className="delete-data-confirm" disabled={deleting}>{deleting ? 'Eliminando…' : 'Confirmar eliminación'}</button>
+          </div>
+        </form>
       )}
     </section>
   )

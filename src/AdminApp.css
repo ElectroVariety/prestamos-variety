@@ -76,8 +76,8 @@
 .archive-button:disabled { opacity:.55; cursor:wait; }
 .archived-badge { display:inline-flex; margin-left:7px; border-radius:99px; padding:5px 9px; background:#eef0f4; color:#4c5563; font-size:11px; font-weight:700; }
 .application-print { display:none; }
-.admin-brand > .admin-logo-frame { display:block; flex:none; width:82px; height:82px; overflow:hidden; border:1px solid var(--brand-silver); border-radius:50%; background:#fff; box-shadow:0 5px 18px #252b3514; }
-.admin-logo-frame > img { display:block; width:112%; height:112%; max-width:none; object-fit:cover; transform:translate(-5.35%,-5.35%); }
+.admin-brand > .admin-logo-frame { position:relative; display:block; flex:none; width:82px; height:82px; overflow:hidden; border:1px solid var(--brand-silver); border-radius:50%; background:#fff; box-shadow:0 5px 18px #252b3514; }
+.admin-logo-frame > img { position:absolute; top:50%; left:50%; display:block; width:112%; height:112%; max-width:none; object-fit:cover; transform:translate(-50%,-50%); }
 .pdf-preview-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:42px; border:1px solid var(--brand-silver); border-radius:9px; padding:8px 12px; background:#fff; color:var(--brand-graphite); font-size:12px; font-weight:700; cursor:pointer; }
 .pdf-preview-button:hover { border-color:var(--brand-electric); background:var(--brand-blue-soft); }
 .pdf-preview-button:disabled { opacity:.55; cursor:wait; }

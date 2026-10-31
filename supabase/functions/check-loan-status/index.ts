@@ -50,10 +50,18 @@ Deno.serve(async (request: Request) => {
   }
 
   const rawCode = typeof body.code === "string" ? body.code.trim().toUpperCase().replace(/[\s-]/g, "") : "";
+  const action = body.action === undefined ? "status" : body.action;
+  if (action !== "status" && action !== "delete_rejected") {
+    return respond({ success: false, error: "La operación solicitada no es válida." }, 400, origin);
+  }
   const isCurrentCode = /^[A-HJ-NP-Z2-9]{9}$/.test(rawCode);
   const isPreviouslyIssuedCode = /^PV[0-9A-F]{32}$/.test(rawCode);
   if (!isCurrentCode && !isPreviouslyIssuedCode) {
     return respond({ success: false, error: "El código ingresado no es válido." }, 400, origin);
+  }
+  const suppliedDni = typeof body.dni === "string" ? body.dni.replace(/\D/g, "") : "";
+  if (action === "delete_rejected" && !/^\d{7,8}$/.test(suppliedDni)) {
+    return respond({ success: false, error: "Ingresá el DNI asociado a la solicitud para confirmar la eliminación." }, 400, origin);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -69,11 +77,58 @@ Deno.serve(async (request: Request) => {
     });
     const trackingCodeHash = await hashTrackingCode(rawCode);
     const { data, error } = await admin.from("loan_applications")
-      .select("status,created_at,decided_at")
+      .select("id,dni,status,created_at,decided_at")
       .eq("tracking_code_hash", trackingCodeHash)
       .maybeSingle();
     if (error) throw error;
     if (!data) return respond({ success: false, error: "No encontramos una solicitud con ese código. Revisalo e intentá nuevamente." }, 404, origin);
+
+    if (action === "delete_rejected") {
+      if (data.status !== "rejected") {
+        return respond({ success: false, error: "La eliminación está disponible únicamente para solicitudes rechazadas." }, 409, origin);
+      }
+      if (suppliedDni !== String(data.dni).replace(/\D/g, "")) {
+        return respond({ success: false, error: "No se pudo confirmar la solicitud. Revisá el DNI y el código." }, 403, origin);
+      }
+
+      const { data: documents, error: documentsError } = await admin.from("loan_documents")
+        .select("storage_path")
+        .eq("application_id", data.id);
+      if (documentsError) throw documentsError;
+
+      const storagePaths = (documents ?? []).map((document) => document.storage_path);
+      if (storagePaths.length > 0) {
+        const { error: storageError } = await admin.storage.from("loan-private-documents").remove(storagePaths);
+        if (storageError) {
+          const { data: stillPresent, error: lookupError } = await admin.from("loan_applications")
+            .select("id")
+            .eq("id", data.id)
+            .maybeSingle();
+          if (lookupError) throw lookupError;
+          if (!stillPresent) return respond({ success: true, deleted: true }, 200, origin);
+          throw storageError;
+        }
+      }
+
+      const { data: deleted, error: deleteError } = await admin.from("loan_applications")
+        .delete()
+        .eq("id", data.id)
+        .eq("status", "rejected")
+        .select("id")
+        .maybeSingle();
+      if (deleteError) throw deleteError;
+      if (!deleted) {
+        const { data: stillPresent, error: lookupError } = await admin.from("loan_applications")
+          .select("id")
+          .eq("id", data.id)
+          .maybeSingle();
+        if (lookupError) throw lookupError;
+        if (!stillPresent) return respond({ success: true, deleted: true }, 200, origin);
+        return respond({ success: false, error: "La solicitud cambió y no se pudo completar la eliminación. Consultá el estado e intentá nuevamente." }, 409, origin);
+      }
+
+      return respond({ success: true, deleted: true }, 200, origin);
+    }
 
     return respond({
       success: true,
