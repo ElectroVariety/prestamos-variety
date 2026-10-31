@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
+import { applicationReference, formatDateTime } from './format'
 
 export type ExportDocument = {
   document_type: string
@@ -261,7 +262,7 @@ export async function buildApplicationPdf(
       drawText(page, `SOLICITUD PERSONAL | ${statusLabels[application.status] || application.status}`, MARGIN + 17, heroY + 71, 8, bold, rgb(155 / 255, 212 / 255, 1))
       drawText(page, 'Solicitud de prestamo', MARGIN + 17, heroY + 47, 20, bold, WHITE)
       drawText(page, application.full_name, MARGIN + 17, heroY + 28, 12, bold, WHITE)
-      drawText(page, `Solicitud ${application.id} | ${new Date(application.created_at).toLocaleString('es-AR')}`, MARGIN + 17, heroY + 12, 7.5, regular, WHITE)
+      drawText(page, `Solicitud #${applicationReference(application.id)} | ${formatDateTime(application.created_at)}`, MARGIN + 17, heroY + 12, 7.5, regular, WHITE)
       y = heroY - 24
     }
     return page
@@ -379,7 +380,7 @@ export async function buildApplicationPdf(
   drawSection('07', 'Consentimientos', [
     ['Tratamiento de datos', application.privacy_accepted ? 'Aceptado' : 'No registrado'],
     ['Notificacion del resultado por WhatsApp', application.whatsapp_rejection_opt_in ? 'Aceptada' : 'No aceptada'],
-    ...(application.whatsapp_rejection_opt_in_at ? [['Consentimiento WhatsApp registrado', new Date(application.whatsapp_rejection_opt_in_at).toLocaleString('es-AR')] as [string, unknown]] : []),
+    ...(application.whatsapp_rejection_opt_in_at ? [['Consentimiento WhatsApp registrado', formatDateTime(application.whatsapp_rejection_opt_in_at)] as [string, unknown]] : []),
   ])
 
   if (attachments.length) {

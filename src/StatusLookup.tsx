@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from './lib/supabase'
+import { formatDateTime } from './lib/format'
 
 type StatusResult = {
   status: 'pending' | 'under_review' | 'approved' | 'rejected'
@@ -74,8 +75,8 @@ export default function StatusLookup({ initialCode }: { initialCode?: string | n
       {result && (
         <div className="status-lookup-result" role="status">
           <span className={`status-lookup-badge status-${result.status}`}>{labels[result.status]}</span>
-          <p>Solicitud recibida el {new Date(result.created_at).toLocaleString('es-AR')}.</p>
-          {result.decided_at && <p>Decisión registrada el {new Date(result.decided_at).toLocaleString('es-AR')}.</p>}
+          <p>Solicitud recibida el {formatDateTime(result.created_at)}.</p>
+          {result.decided_at && <p>Decisión registrada el {formatDateTime(result.decided_at)}.</p>}
           <small>Por privacidad, esta consulta solo muestra el estado de la solicitud.</small>
         </div>
       )}

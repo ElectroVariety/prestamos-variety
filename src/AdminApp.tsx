@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
+import { applicationReference, formatDateTime } from './lib/format'
 import type { DownloadedAttachment, ExportApplication } from './lib/application-export'
 import './AdminApp.css'
 
@@ -498,7 +499,7 @@ export default function AdminApp() {
             <span className="pdf-kicker">SOLICITUD PERSONAL · {statusLabel[selected.status] || selected.status}</span>
             <h1>Solicitud de préstamo</h1>
             <p>{selected.full_name}</p>
-            <small>Solicitud {selected.id} · {new Date(selected.created_at).toLocaleString('es-AR')}</small>
+            <small>Solicitud #{applicationReference(selected.id)} · {formatDateTime(selected.created_at)}</small>
           </section>
 
           <PdfSection number="01" title="Datos personales">
@@ -570,7 +571,7 @@ export default function AdminApp() {
             <b>Consentimientos</b>
             <p>Tratamiento de datos: {selected.privacy_accepted ? 'Aceptado' : 'No registrado'}</p>
             <p>Notificación del resultado por WhatsApp: {selected.whatsapp_rejection_opt_in ? 'Aceptada' : 'No aceptada'}</p>
-            {selected.whatsapp_rejection_opt_in_at && <small>Consentimiento de WhatsApp registrado el {new Date(selected.whatsapp_rejection_opt_in_at).toLocaleString('es-AR')}</small>}
+            {selected.whatsapp_rejection_opt_in_at && <small>Consentimiento de WhatsApp registrado el {formatDateTime(selected.whatsapp_rejection_opt_in_at)}</small>}
           </section>
 
           <section className="pdf-documents">
@@ -656,7 +657,7 @@ export default function AdminApp() {
           {!selected ? <div className="admin-empty detail-placeholder">Elegí una solicitud para ver sus datos y documentación.</div> : (
             <>
               <div className="detail-header">
-                <div><span className={'status-badge status-' + selected.status}>{statusLabel[selected.status] || selected.status}</span>{selected.archived_at && <span className="archived-badge">Archivada</span>}<h2>{selected.full_name}</h2><p>Solicitud {selected.id} · {new Date(selected.created_at).toLocaleString('es-AR')}</p></div>
+                <div><span className={'status-badge status-' + selected.status}>{statusLabel[selected.status] || selected.status}</span>{selected.archived_at && <span className="archived-badge">Archivada</span>}<h2>{selected.full_name}</h2><p>Solicitud #{applicationReference(selected.id)} · {formatDateTime(selected.created_at)}</p></div>
                 <div className="detail-header-actions">
                   <button className="archive-button" onClick={() => void setApplicationArchived(!selected.archived_at)} disabled={loading}>{selected.archived_at ? 'Restaurar' : 'Archivar'}</button>
                   <button className="pdf-preview-button" onClick={() => void previewApplicationPdf()} disabled={exporting} aria-label="Ver solicitud como PDF" title="Ver solicitud como PDF">
@@ -748,7 +749,7 @@ export default function AdminApp() {
                 <div className="detail-grid">
                   <div><small>Aceptó el tratamiento de datos</small><b>{selected.privacy_accepted ? 'Sí' : 'No registrado'}</b></div>
                   <div><small>Aceptó recibir el resultado por WhatsApp</small><b>{selected.whatsapp_rejection_opt_in ? 'Sí' : 'No'}</b></div>
-                  {selected.whatsapp_rejection_opt_in_at && <div><small>Fecha del consentimiento de WhatsApp</small><b>{new Date(selected.whatsapp_rejection_opt_in_at).toLocaleString('es-AR')}</b></div>}
+                  {selected.whatsapp_rejection_opt_in_at && <div><small>Fecha del consentimiento de WhatsApp</small><b>{formatDateTime(selected.whatsapp_rejection_opt_in_at)}</b></div>}
                 </div>
               </div>
               <div className="detail-subsection">
@@ -762,7 +763,7 @@ export default function AdminApp() {
               {(selected.decided_at || selected.decided_by || selected.admin_notes) && (
                 <div className="detail-subsection">
                   <h3>Registro de decisión</h3>
-                  {selected.decided_at && <p><b>Fecha:</b> {new Date(selected.decided_at).toLocaleString('es-AR')}</p>}
+                  {selected.decided_at && <p><b>Fecha:</b> {formatDateTime(selected.decided_at)}</p>}
                   {selected.decided_by && <p><b>Cuenta administradora:</b> {selected.decided_by === session.user.id ? session.user.email || selected.decided_by : selected.decided_by}</p>}
                   {selected.admin_notes && <p><b>Nota interna:</b> {selected.admin_notes}</p>}
                 </div>
@@ -781,7 +782,7 @@ export default function AdminApp() {
                           unknown: 'No se pudo confirmar el resultado',
                           not_eligible: 'Sin consentimiento',
                         }[selected.whatsapp_rejection_status] || selected.whatsapp_rejection_status}</p>
-                        {selected.whatsapp_rejection_sent_at && <p><b>Fecha de envío:</b> {new Date(selected.whatsapp_rejection_sent_at).toLocaleString('es-AR')}</p>}
+                        {selected.whatsapp_rejection_sent_at && <p><b>Fecha de envío:</b> {formatDateTime(selected.whatsapp_rejection_sent_at)}</p>}
                         {selected.whatsapp_rejection_error_code && <p><b>Detalle técnico:</b> {selected.whatsapp_rejection_error_code}</p>}
                         {(selected.whatsapp_rejection_status === 'pending' || selected.whatsapp_rejection_status === 'failed') && (
                           <button className="whatsapp-prepare" disabled={loading} onClick={() => void retryRejectionWhatsApp()}>
