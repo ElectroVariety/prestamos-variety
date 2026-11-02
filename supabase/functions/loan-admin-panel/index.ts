@@ -1,7 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const BUCKET = "loan-private-documents";
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 250;
 const origins = new Set([
   "http://localhost:5173",
   "http://127.0.0.1:5173",
@@ -20,6 +20,48 @@ async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper:
     }
   }));
   return results;
+}
+
+async function prepareApplicationDetails(admin: SupabaseClient, applications: Array<Record<string, unknown>>) {
+  if (applications.length === 0) return [];
+  const applicationIds = applications.map((application) => String(application.id));
+  const [incomeResult, docsResult] = await Promise.all([
+    admin.from("loan_income_sources").select("*").in("application_id", applicationIds),
+    admin.from("loan_documents").select("id,application_id,document_type,storage_path,original_filename,file_size_bytes").in("application_id", applicationIds),
+  ]);
+  if (incomeResult.error || docsResult.error) throw new Error("No se pudieron cargar los ingresos o los documentos asociados.");
+
+  const rawDocuments = docsResult.data ?? [];
+  const signedDocuments = await mapWithConcurrency(rawDocuments, 8, async (document) => {
+    const { data, error } = await admin.storage.from(BUCKET).createSignedUrl(document.storage_path, 300);
+    if (error || !data) {
+      console.warn("No se pudo preparar un enlace temporal para un documento; la solicitud continuará cargando.");
+      return { ...document, signed_url: null as string | null };
+    }
+    return { ...document, signed_url: data.signedUrl as string | null };
+  });
+
+  const incomesByApplication = new Map<string, typeof incomeResult.data>();
+  for (const income of incomeResult.data ?? []) {
+    const group = incomesByApplication.get(income.application_id) ?? [];
+    group.push(income);
+    incomesByApplication.set(income.application_id, group);
+  }
+  const documentsByApplication = new Map<string, typeof signedDocuments>();
+  for (const document of signedDocuments) {
+    const group = documentsByApplication.get(document.application_id) ?? [];
+    group.push(document);
+    documentsByApplication.set(document.application_id, group);
+  }
+
+  return applications.map((application) => {
+    const { tracking_code_hash: _trackingCodeHash, ...safeApplication } = application;
+    return {
+      ...safeApplication,
+      incomes: incomesByApplication.get(String(application.id)) ?? [],
+      documents: (documentsByApplication.get(String(application.id)) ?? []).map(({ storage_path: _storagePath, application_id: _applicationId, ...document }) => document),
+    };
+  });
 }
 
 function respond(body: Record<string, unknown>, status: number, origin: string) {
@@ -205,6 +247,49 @@ Deno.serve(async (request: Request) => {
     body = parsed as Record<string, unknown>;
   } catch { return respond({ error: "La solicitud no tiene un formato válido." }, 400, origin); }
 
+  if (body.action === "detail") {
+    const id = typeof body.application_id === "string" ? body.application_id : "";
+    if (!id) return respond({ error: "La solicitud indicada no es válida." }, 400, origin);
+    const { data: application, error } = await admin.from("loan_applications").select("*").eq("id", id).maybeSingle();
+    if (error) {
+      console.error("No se pudo leer el detalle de la solicitud:", error.message);
+      return respond({ error: "No se pudieron cargar los datos de la solicitud." }, 500, origin);
+    }
+    if (!application) return respond({ error: "La solicitud ya no está disponible." }, 404, origin);
+    try {
+      const [prepared] = await prepareApplicationDetails(admin, [application]);
+      return respond({ success: true, application: prepared }, 200, origin);
+    } catch (error) {
+      console.error("No se pudo preparar el detalle de la solicitud:", error instanceof Error ? error.message : error);
+      return respond({ error: "No se pudieron cargar los datos y documentos de la solicitud." }, 500, origin);
+    }
+  }
+
+  if (body.action === "details") {
+    let ids: unknown;
+    try { ids = typeof body.application_ids === "string" ? JSON.parse(body.application_ids) : null; }
+    catch { return respond({ error: "La lista de solicitudes no tiene un formato válido." }, 400, origin); }
+    if (!Array.isArray(ids) || ids.length < 1 || ids.length > PAGE_SIZE || !ids.every((id) => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id))) {
+      return respond({ error: "La cantidad o el formato de solicitudes no es válido." }, 400, origin);
+    }
+    const uniqueIds = [...new Set(ids as string[])];
+    const { data: applications, error } = await admin.from("loan_applications").select("*").in("id", uniqueIds);
+    if (error) {
+      console.error("No se pudieron leer los detalles de las solicitudes:", error.message);
+      return respond({ error: "No se pudieron cargar los datos de las solicitudes." }, 500, origin);
+    }
+    if ((applications ?? []).length !== uniqueIds.length) return respond({ error: "Algunas solicitudes ya no están disponibles." }, 404, origin);
+    try {
+      const applicationsById = new Map((applications ?? []).map((application) => [application.id, application]));
+      const orderedApplications = uniqueIds.map((id) => applicationsById.get(id)!);
+      const prepared = await prepareApplicationDetails(admin, orderedApplications);
+      return respond({ success: true, applications: prepared }, 200, origin);
+    } catch (error) {
+      console.error("No se pudieron preparar los detalles de las solicitudes:", error instanceof Error ? error.message : error);
+      return respond({ error: "No se pudieron cargar los datos y documentos de las solicitudes." }, 500, origin);
+    }
+  }
+
   if (body.action === "decide") {
     const id = typeof body.application_id === "string" ? body.application_id : "";
     const status = body.status;
@@ -322,7 +407,8 @@ Deno.serve(async (request: Request) => {
     return respond({ success: true }, 200, origin);
   }
 
-  if (body.action !== "list") return respond({ error: "La operación solicitada no es válida." }, 400, origin);
+  const summaryList = body.action === "list_summary";
+  if (body.action !== "list" && !summaryList) return respond({ error: "La operación solicitada no es válida." }, 400, origin);
   const status = body.status;
   if (status !== "pending" && status !== "under_review" && status !== "approved" && status !== "rejected" && status !== "all" && status !== "archived") return respond({ error: "El filtro indicado no es válido." }, 400, origin);
 
@@ -331,7 +417,7 @@ Deno.serve(async (request: Request) => {
   const offset = rawOffset;
 
   let query = admin.from("loan_applications")
-    .select("*")
+    .select(summaryList ? "id,status,full_name,dni,created_at,loan_amount,archived_at" : "*")
     .order("created_at", { ascending: true })
     .order("id", { ascending: true })
     .range(offset, offset + PAGE_SIZE);
@@ -346,36 +432,14 @@ Deno.serve(async (request: Request) => {
     return respond({ error: "No se pudieron cargar las solicitudes. Verificá el esquema de loan_applications." }, 500, origin);
   }
 
+  const pageApplications = applications ?? [];
+  const hasMore = pageApplications.length > PAGE_SIZE;
+  const page = pageApplications.slice(0, PAGE_SIZE);
+  if (summaryList) return respond({ success: true, applications: page, has_more: hasMore, next_offset: offset + page.length }, 200, origin);
   try {
-    const pageApplications = applications ?? [];
-    const hasMore = pageApplications.length > PAGE_SIZE;
-    const preparedApplications = await Promise.all(pageApplications.slice(0, PAGE_SIZE).map(async (application) => {
-      const [incomeResult, docsResult] = await Promise.all([
-        admin.from("loan_income_sources").select("*").eq("application_id", application.id),
-        admin.from("loan_documents").select("id,document_type,storage_path,original_filename,file_size_bytes").eq("application_id", application.id),
-      ]);
-      if (incomeResult.error || docsResult.error) throw new Error("No se pudieron cargar los ingresos o los documentos asociados.");
-      const { tracking_code_hash: _trackingCodeHash, ...safeApplication } = application;
-      return { application: safeApplication, incomes: incomeResult.data ?? [], rawDocuments: docsResult.data ?? [] };
-    }));
-    const allDocuments = preparedApplications.flatMap((item) => item.rawDocuments);
-    const signedDocuments = await mapWithConcurrency(allDocuments, 8, async (document) => {
-      const { data, error } = await admin.storage.from(BUCKET).createSignedUrl(document.storage_path, 300);
-      if (error || !data) {
-        console.warn("No se pudo preparar un enlace temporal para un documento; la lista continuará cargando.");
-        return { id: document.id, document_type: document.document_type, original_filename: document.original_filename, file_size_bytes: document.file_size_bytes, signed_url: null as string | null };
-      }
-      return { id: document.id, document_type: document.document_type, original_filename: document.original_filename, file_size_bytes: document.file_size_bytes, signed_url: data.signedUrl as string | null };
-    });
-    const signedDocumentById = new Map(signedDocuments.map((document) => [document.id, document]));
-    const results = preparedApplications.map((item) => ({
-      ...item.application,
-      incomes: item.incomes,
-      documents: item.rawDocuments.map((document) => signedDocumentById.get(document.id)!),
-    }));
-    return respond({ success: true, applications: results, has_more: hasMore, next_offset: offset + results.length }, 200, origin);
-  }
-  catch (error) {
+    const prepared = await prepareApplicationDetails(admin, page);
+    return respond({ success: true, applications: prepared, has_more: hasMore, next_offset: offset + prepared.length }, 200, origin);
+  } catch (error) {
     console.error("No se pudieron preparar las solicitudes:", error instanceof Error ? error.message : error);
     return respond({ error: "No se pudieron cargar los detalles y documentos." }, 500, origin);
   }
