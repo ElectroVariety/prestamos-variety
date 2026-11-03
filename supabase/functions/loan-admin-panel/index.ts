@@ -265,6 +265,28 @@ Deno.serve(async (request: Request) => {
     }
   }
 
+  if (body.action === "document_link") {
+    const applicationId = typeof body.application_id === "string" ? body.application_id : "";
+    const documentId = typeof body.document_id === "string" ? body.document_id : "";
+    if (!applicationId || !documentId) return respond({ error: "El documento indicado no es válido." }, 400, origin);
+    const { data: document, error } = await admin.from("loan_documents")
+      .select("storage_path")
+      .eq("id", documentId)
+      .eq("application_id", applicationId)
+      .maybeSingle();
+    if (error) {
+      console.error("No se pudo localizar el documento solicitado:", error.message);
+      return respond({ error: "No se pudo preparar el enlace del documento." }, 500, origin);
+    }
+    if (!document) return respond({ error: "El documento ya no está disponible." }, 404, origin);
+    const { data, error: signingError } = await admin.storage.from(BUCKET).createSignedUrl(document.storage_path, 300);
+    if (signingError || !data?.signedUrl) {
+      console.error("No se pudo crear un enlace temporal para el documento:", signingError?.message);
+      return respond({ error: "No se pudo preparar el enlace temporal del documento." }, 500, origin);
+    }
+    return respond({ success: true, signed_url: data.signedUrl }, 200, origin);
+  }
+
   if (body.action === "details") {
     let ids: unknown;
     try { ids = typeof body.application_ids === "string" ? JSON.parse(body.application_ids) : null; }

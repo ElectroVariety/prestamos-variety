@@ -177,6 +177,25 @@ export default function AdminApp() {
     return data
   }, [])
 
+  const openDocument = async (applicationId: string, document: Document) => {
+    const documentWindow = window.open('about:blank', '_blank')
+    if (!documentWindow) {
+      setError('El navegador bloqueó la pestaña del documento. Permití ventanas emergentes e intentá de nuevo.')
+      return
+    }
+    documentWindow.opener = null
+    documentWindow.document.title = 'Abriendo documento…'
+    documentWindow.document.body.textContent = 'Abriendo documento…'
+    try {
+      const result = await callAdmin({ action: 'document_link', application_id: applicationId, document_id: document.id })
+      if (typeof result.signed_url !== 'string') throw new Error('No se recibió un enlace válido para el documento.')
+      documentWindow.location.replace(result.signed_url)
+    } catch (cause) {
+      documentWindow.close()
+      setError(cause instanceof Error ? cause.message : 'No se pudo abrir el documento. Actualizá el panel e intentá de nuevo.')
+    }
+  }
+
   const loadApplications = useCallback(async () => {
     if (!session) return
     setLoading(true)
@@ -404,7 +423,7 @@ export default function AdminApp() {
     }
   }
 
-  const previewApplicationPdf = async () => {
+  const previewApplicationPdf = async (androidWindow: Window | null = null) => {
     if (!selected || exporting) return
     setExporting(true)
     setExportProgress('Preparando la vista previa de la solicitud y sus archivos adjuntos…')
@@ -412,14 +431,32 @@ export default function AdminApp() {
     setNotice('')
     try {
       const { blob } = await createSelectedApplicationPdf()
-      if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl)
-      setPdfPreviewUrl(URL.createObjectURL(blob))
+      const url = URL.createObjectURL(blob)
+      if (androidWindow) {
+        androidWindow.location.replace(url)
+        window.setTimeout(() => URL.revokeObjectURL(url), 10 * 60 * 1000)
+        setNotice('La vista previa del PDF se abrió en una pestaña nueva.')
+      } else {
+        if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl)
+        setPdfPreviewUrl(url)
+      }
     } catch (cause) {
+      androidWindow?.close()
       setError(cause instanceof Error ? cause.message : 'No se pudo abrir la vista previa del PDF.')
     } finally {
       setExporting(false)
       setExportProgress('')
     }
+  }
+
+  const startPdfPreview = () => {
+    const android = /Android/i.test(navigator.userAgent)
+    const androidWindow = android ? window.open('about:blank', '_blank') : null
+    if (android && !androidWindow) {
+      setError('El navegador bloqueó la pestaña del PDF. Permití ventanas emergentes e intentá de nuevo.')
+      return
+    }
+    void previewApplicationPdf(androidWindow)
   }
 
   const closePdfPreview = () => {
@@ -687,7 +724,7 @@ export default function AdminApp() {
                 <div><span className={'status-badge status-' + selected.status}>{statusLabel[selected.status] || selected.status}</span>{selected.archived_at && <span className="archived-badge">Archivada</span>}<h2>{selected.full_name}</h2><p>Solicitud #{applicationReference(selected.id)} · {formatDateTime(selected.created_at)}</p></div>
                 <div className="detail-header-actions">
                   <button className="archive-button" onClick={() => void setApplicationArchived(!selected.archived_at)} disabled={loading}>{selected.archived_at ? 'Restaurar' : 'Archivar'}</button>
-                  <button className="pdf-preview-button" onClick={() => void previewApplicationPdf()} disabled={exporting} aria-label="Ver solicitud como PDF" title="Ver solicitud como PDF">
+                  <button className="pdf-preview-button" onClick={startPdfPreview} disabled={exporting} aria-label="Ver solicitud como PDF" title="Ver solicitud como PDF">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
                     <span>Ver PDF</span>
                   </button>
@@ -782,15 +819,9 @@ export default function AdminApp() {
               <div className="detail-subsection">
                 <h3>Documentación <span>{selected.documents.length}</span></h3>
                 {selected.documents.length ? selected.documents.map((document) => (
-                  document.signed_url ? (
-                    <a className="document-row" key={document.id} href={document.signed_url} target="_blank" rel="noreferrer">
-                      <span>▧</span><span><b>{documentLabels[document.document_type] || document.document_type}</b><small>{document.original_filename} · {Math.max(1, Math.round(document.file_size_bytes / 1024))} KB</small></span><strong>Ver ↗</strong>
-                    </a>
-                  ) : (
-                    <div className="document-row" key={document.id} aria-label="Enlace temporal no disponible">
-                      <span>▧</span><span><b>{documentLabels[document.document_type] || document.document_type}</b><small>{document.original_filename} · {Math.max(1, Math.round(document.file_size_bytes / 1024))} KB · Actualizá para intentar de nuevo</small></span><strong>No disponible</strong>
-                    </div>
-                  )
+                  <a className="document-row" key={document.id} href={document.signed_url || '#'} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); void openDocument(selected.id, document) }}>
+                    <span>▧</span><span><b>{documentLabels[document.document_type] || document.document_type}</b><small>{document.original_filename} · {Math.max(1, Math.round(document.file_size_bytes / 1024))} KB</small></span><strong>Ver ↗</strong>
+                  </a>
                 )) : <p>No hay documentos cargados.</p>}
               </div>
               {(selected.decided_at || selected.decided_by || selected.admin_notes) && (
