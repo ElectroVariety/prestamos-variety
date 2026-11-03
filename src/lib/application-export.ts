@@ -316,7 +316,7 @@ export async function buildApplicationPdf(
     const top = PAGE_HEIGHT - 72
     const bottom = 34
     const rowHeight = (top - bottom) / dniAttachments.length
-    const maxWidth = PAGE_WIDTH - MARGIN * 2 - 12
+    const imageWidth = PAGE_WIDTH - MARGIN * 2
 
     for (const [index, { document, bytes }] of dniAttachments.entries()) {
       const label = documentLabels[document.document_type] || document.document_type
@@ -340,23 +340,16 @@ export async function buildApplicationPdf(
         const converted = mime === 'image/webp' ? await imageAsJpeg(bytes, mime) : null
         const imageBytes = converted?.bytes || bytes
         const embedded = mime === 'image/png' ? await pdf.embedPng(imageBytes) : await pdf.embedJpg(imageBytes)
-        const imageWidth = converted?.width || embedded.width
-        const imageHeight = converted?.height || embedded.height
         const rowTop = top - index * rowHeight
-        identityPage.drawText(safeText(label), { x: MARGIN, y: rowTop - 8, size: 10, font: bold, color: BLUE, maxWidth })
-        identityPage.drawText(safeText(filename), { x: MARGIN, y: rowTop - 23, size: 7, font: regular, color: MUTED, maxWidth })
-        const maxHeight = rowHeight - 44
-        const scale = Math.min(maxWidth / imageWidth, maxHeight / imageHeight)
-        const width = imageWidth * scale
-        const height = imageHeight * scale
-        const imageX = (PAGE_WIDTH - width) / 2
-        const imageY = rowTop - 33 - height
-        identityPage.drawRectangle({ x: imageX - 5, y: imageY - 5, width: width + 10, height: height + 10, color: WHITE, borderColor: SILVER, borderWidth: 0.7 })
-        identityPage.drawImage(embedded, { x: imageX, y: imageY, width, height })
+        identityPage.drawText(safeText(label), { x: MARGIN, y: rowTop - 8, size: 10, font: bold, color: BLUE, maxWidth: imageWidth })
+        identityPage.drawText(safeText(filename), { x: MARGIN, y: rowTop - 23, size: 7, font: regular, color: MUTED, maxWidth: imageWidth })
+        const imageHeight = rowHeight - 28
+        const imageY = rowTop - 28 - imageHeight
+        identityPage.drawImage(embedded, { x: MARGIN, y: imageY, width: imageWidth, height: imageHeight })
       } catch {
         const rowTop = top - index * rowHeight
-        identityPage.drawText(safeText(`${label}: ${filename}`), { x: MARGIN, y: rowTop - 8, size: 9, font: bold, color: GRAPHITE, maxWidth })
-        identityPage.drawText('No se pudo incorporar la vista previa.', { x: MARGIN, y: rowTop - 26, size: 8, font: regular, color: MUTED, maxWidth })
+        identityPage.drawText(safeText(`${label}: ${filename}`), { x: MARGIN, y: rowTop - 8, size: 9, font: bold, color: GRAPHITE, maxWidth: imageWidth })
+        identityPage.drawText('No se pudo incorporar la vista previa.', { x: MARGIN, y: rowTop - 26, size: 8, font: regular, color: MUTED, maxWidth: imageWidth })
       }
     }
     page = addPage()
