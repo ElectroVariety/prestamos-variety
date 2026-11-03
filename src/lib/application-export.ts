@@ -119,7 +119,7 @@ const documentLabels: Record<string, string> = {
 }
 
 const incomeFields: Array<[string, string, boolean?]> = [
-  ['activity_description', 'Actividad / origen del ingreso'],
+  ['activity_description', 'Ocupación / actividad / origen del ingreso'],
   ['wallet_provider', 'Billetera virtual utilizada'],
   ['benefit_name', 'Beneficio o institución'],
   ['business_name', 'Nombre del comercio'],

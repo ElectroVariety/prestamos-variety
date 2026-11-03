@@ -334,6 +334,7 @@ function App() {
       source_type: sourceTypeMap[type],
       monthly_income: numeric(`income_${type}`),
       activity_description:
+        ['formal', 'informal'].includes(type) ? value(`occupation_${type}`) :
         type === 'selfEmployed' ? value('self_employed_activity') :
         type === 'other' ? value('other_income_description') :
         type === 'business' ? value('business_activity') : null,
@@ -808,6 +809,14 @@ function App() {
                       required
                     />
                   </Field>
+
+                  {type === 'formal' && (
+                    <Field label="¿A qué te dedicás en tu trabajo?"><input name="occupation_formal" required /></Field>
+                  )}
+
+                  {type === 'informal' && (
+                    <Field label="¿A qué te dedicás en tu trabajo?"><input name="occupation_informal" required /></Field>
+                  )}
 
                   {type === 'formal' && (
                     <Upload label="Recibo de sueldo" fileKey="salary_receipt" onFilesChange={handleFilesChange} resetKey={uploadResetKey} />

@@ -287,6 +287,7 @@ Deno.serve(async (req: Request) => {
       return respond({ error: "Completá todos los datos del comercio." }, 400, origin);
     }
     if (sourceType === "self_employed" && !activityDescription) return respond({ error: "Indicá tu actividad independiente." }, 400, origin);
+    if (["formal_employment", "informal_employment"].includes(String(sourceType)) && !activityDescription) return respond({ error: "Indicá a qué te dedicás en tu trabajo." }, 400, origin);
     if (sourceType === "informal_employment" && !walletProvider) return respond({ error: "Indicá la billetera virtual utilizada." }, 400, origin);
     normalizedSources.push({
       source_type: sourceType,

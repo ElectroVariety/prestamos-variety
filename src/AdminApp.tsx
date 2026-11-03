@@ -59,7 +59,7 @@ const housingLabels: Record<string, string> = {
 }
 
 const incomeDetailFields: Array<[string, string, boolean?]> = [
-  ['activity_description', 'Actividad / origen'],
+  ['activity_description', 'Ocupación / actividad / origen'],
   ['wallet_provider', 'Billetera virtual'],
   ['benefit_name', 'Beneficio o institución'],
   ['business_name', 'Nombre del comercio'],
