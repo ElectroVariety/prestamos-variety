@@ -27,7 +27,7 @@ type Application = ExportApplication & {
   documents: Document[]
 }
 
-type ApplicationSummary = Pick<Application, 'id' | 'status' | 'full_name' | 'dni' | 'created_at' | 'loan_amount' | 'archived_at'>
+type ApplicationSummary = Pick<Application, 'id' | 'status' | 'full_name' | 'dni' | 'created_at' | 'loan_amount' | 'archived_at' | 'is_electro_variety_client'> & { has_salary_receipt: boolean }
 
 const money = (amount: unknown) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Number(amount) || 0)
@@ -115,6 +115,8 @@ export default function AdminApp() {
   const [detailLoading, setDetailLoading] = useState(false)
   const selectedRequestId = useRef(0)
   const [filter, setFilter] = useState('pending')
+  const [onlyElectroClients, setOnlyElectroClients] = useState(false)
+  const [onlySalaryReceipt, setOnlySalaryReceipt] = useState(false)
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -477,6 +479,11 @@ export default function AdminApp() {
     setPdfPreviewUrl(null)
   }
 
+  const visibleApplications = applications.filter((application) => {
+    return (!onlyElectroClients || application.is_electro_variety_client === true)
+      && (!onlySalaryReceipt || application.has_salary_receipt)
+  })
+
   const toggleApplication = (id: string) => {
     setSelectedIds((current) => {
       const next = new Set(current)
@@ -489,8 +496,8 @@ export default function AdminApp() {
   const selectVisibleApplications = () => {
     setSelectedIds((current) => {
       const next = new Set(current)
-      const allVisibleSelected = applications.length > 0 && applications.every((application) => next.has(application.id))
-      applications.forEach((application) => allVisibleSelected ? next.delete(application.id) : next.add(application.id))
+      const allVisibleSelected = visibleApplications.length > 0 && visibleApplications.every((application) => next.has(application.id))
+      visibleApplications.forEach((application) => allVisibleSelected ? next.delete(application.id) : next.add(application.id))
       return next
     })
   }
@@ -706,11 +713,15 @@ export default function AdminApp() {
       )}
       <div className="admin-layout">
         <section className="admin-list" aria-label="Listado de solicitudes">
-          <div className="admin-list-header"><b>{applications.length} solicitudes cargadas</b><button onClick={() => void loadApplications()} disabled={loading}>Actualizar</button></div>
+          <div className="admin-list-header"><b>{visibleApplications.length} solicitudes cargadas</b><button onClick={() => void loadApplications()} disabled={loading}>Actualizar</button></div>
           <div className="bulk-export-toolbar">
             <b>{selectedIds.size} seleccionadas</b>
+            <div className="application-criteria-filters" aria-label="Filtros de prioridad">
+              <label><input type="checkbox" checked={onlyElectroClients} onChange={(event) => { setOnlyElectroClients(event.target.checked); setSelectedIds(new Set()) }} /> Cliente de Electro Variety</label>
+              <label><input type="checkbox" checked={onlySalaryReceipt} onChange={(event) => { setOnlySalaryReceipt(event.target.checked); setSelectedIds(new Set()) }} /> Tiene recibo de sueldo</label>
+            </div>
             <div className="bulk-export-actions">
-              <button onClick={selectVisibleApplications} disabled={!applications.length || loading || exporting}>Seleccionar todas del filtro</button>
+              <button onClick={selectVisibleApplications} disabled={!visibleApplications.length || loading || exporting}>Seleccionar todas del filtro</button>
               <button onClick={() => setSelectedIds(new Set())} disabled={!selectedIds.size || exporting}>Limpiar</button>
               <button className="bulk-download-button" onClick={() => void downloadSelectedZip()} disabled={!selectedIds.size || exporting} aria-label={exporting ? 'Preparando el archivo ZIP' : 'Descargar solicitudes seleccionadas en ZIP'} title={exporting ? 'Preparando el archivo ZIP' : 'Descargar solicitudes seleccionadas en ZIP'}>
                 <img className="download-logo" src={`${import.meta.env.BASE_URL}prestamos-variety-logo.jpg`} alt="" aria-hidden="true" />
@@ -720,8 +731,8 @@ export default function AdminApp() {
             <small>Se muestran todas las solicitudes del filtro. Para incluir archivadas, elegí “Archivadas” arriba.</small>
           </div>
           {loading && <p className="admin-empty">Cargando…</p>}
-          {!loading && applications.length === 0 && <p className="admin-empty">No hay solicitudes en este filtro.</p>}
-          {applications.map((application) => (
+          {!loading && visibleApplications.length === 0 && <p className="admin-empty">No hay solicitudes que coincidan con estos filtros.</p>}
+          {visibleApplications.map((application) => (
             <div className="application-list-item" key={application.id}>
               <input
                 type="checkbox"

@@ -439,7 +439,7 @@ Deno.serve(async (request: Request) => {
   const offset = rawOffset;
 
   let query = admin.from("loan_applications")
-    .select(summaryList ? "id,status,full_name,dni,created_at,loan_amount,archived_at" : "*")
+    .select(summaryList ? "id,status,full_name,dni,created_at,loan_amount,archived_at,is_electro_variety_client" : "*")
     .order("created_at", { ascending: true })
     .order("id", { ascending: true })
     .range(offset, offset + PAGE_SIZE);
@@ -457,7 +457,26 @@ Deno.serve(async (request: Request) => {
   const pageApplications = applications ?? [];
   const hasMore = pageApplications.length > PAGE_SIZE;
   const page = pageApplications.slice(0, PAGE_SIZE);
-  if (summaryList) return respond({ success: true, applications: page, has_more: hasMore, next_offset: offset + page.length }, 200, origin);
+  if (summaryList) {
+    const pageIds = page.map((application) => String(application.id));
+    const salaryReceiptIds = new Set<string>();
+    if (pageIds.length) {
+      const { data: salaryReceipts, error: salaryReceiptError } = await admin.from("loan_documents")
+        .select("application_id")
+        .in("application_id", pageIds)
+        .eq("document_type", "salary_receipt");
+      if (salaryReceiptError) {
+        console.error("No se pudo comprobar el recibo de sueldo:", salaryReceiptError.message);
+        return respond({ error: "No se pudo cargar el filtro de recibos de sueldo." }, 500, origin);
+      }
+      (salaryReceipts ?? []).forEach((document) => salaryReceiptIds.add(String(document.application_id)));
+    }
+    const summaries = page.map((application) => ({
+      ...application,
+      has_salary_receipt: salaryReceiptIds.has(String(application.id)),
+    }));
+    return respond({ success: true, applications: summaries, has_more: hasMore, next_offset: offset + page.length }, 200, origin);
+  }
   try {
     const prepared = await prepareApplicationDetails(admin, page);
     return respond({ success: true, applications: prepared, has_more: hasMore, next_offset: offset + prepared.length }, 200, origin);
