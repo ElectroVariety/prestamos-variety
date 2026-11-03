@@ -311,14 +311,12 @@ export async function buildApplicationPdf(
     .filter(({ document }) => ['dni_front', 'dni_back'].includes(document.document_type))
     .sort((a, b) => ['dni_front', 'dni_back'].indexOf(a.document.document_type) - ['dni_front', 'dni_back'].indexOf(b.document.document_type))
   if (dniAttachments.length) {
-    ensureRoom(45)
-    y -= 7
-    page.drawRectangle({ x: MARGIN, y: y - 19, width: 24, height: 24, color: PALE_BLUE })
-    page.drawText('01', { x: MARGIN + 3, y: y - 11, size: 7.5, font: bold, color: BLUE })
-    page.drawText('Frente y dorso de tu DNI', { x: MARGIN + 33, y: y - 11, size: 12, font: bold, color: GRAPHITE })
-    y -= 31
+    const identityPage = addPage()
+    identityPage.drawText('FRENTE Y DORSO DE TU DNI', { x: MARGIN, y: PAGE_HEIGHT - 52, size: 13, font: bold, color: GRAPHITE })
+    const gap = 18
+    const columnWidth = (PAGE_WIDTH - MARGIN * 2 - gap) / 2
 
-    for (const { document, bytes } of dniAttachments) {
+    for (const [index, { document, bytes }] of dniAttachments.entries()) {
       const label = documentLabels[document.document_type] || document.document_type
       const filename = safeFilename(document.original_filename)
       const lowerName = filename.toLowerCase()
@@ -342,19 +340,22 @@ export async function buildApplicationPdf(
         const embedded = mime === 'image/png' ? await pdf.embedPng(imageBytes) : await pdf.embedJpg(imageBytes)
         const imageWidth = converted?.width || embedded.width
         const imageHeight = converted?.height || embedded.height
-        const imagePage = addPage()
-        imagePage.drawText(safeText(label), { x: MARGIN, y: PAGE_HEIGHT - 60, size: 13, font: bold, color: GRAPHITE })
-        imagePage.drawText(safeText(filename), { x: MARGIN, y: PAGE_HEIGHT - 77, size: 8, font: regular, color: MUTED })
-        const maxWidth = PAGE_WIDTH - MARGIN * 2
-        const maxHeight = PAGE_HEIGHT - 145
+        const x = MARGIN + index * (columnWidth + gap)
+        identityPage.drawText(safeText(label), { x, y: PAGE_HEIGHT - 82, size: 10, font: bold, color: BLUE, maxWidth: columnWidth })
+        identityPage.drawText(safeText(filename), { x, y: PAGE_HEIGHT - 97, size: 7, font: regular, color: MUTED, maxWidth: columnWidth })
+        const maxWidth = columnWidth - 12
+        const maxHeight = 230
         const scale = Math.min(maxWidth / imageWidth, maxHeight / imageHeight)
         const width = imageWidth * scale
         const height = imageHeight * scale
-        imagePage.drawImage(embedded, { x: (PAGE_WIDTH - width) / 2, y: Math.max(40, (PAGE_HEIGHT - height) / 2 - 20), width, height })
+        const imageX = x + (columnWidth - width) / 2
+        const imageY = PAGE_HEIGHT - 118 - height
+        identityPage.drawRectangle({ x: imageX - 5, y: imageY - 5, width: width + 10, height: height + 10, color: WHITE, borderColor: SILVER, borderWidth: 0.7 })
+        identityPage.drawImage(embedded, { x: imageX, y: imageY, width, height })
       } catch {
-        const fallback = addPage()
-        fallback.drawText(safeText(`${label}: ${filename}`), { x: MARGIN, y: PAGE_HEIGHT - 70, size: 12, font: bold, color: GRAPHITE })
-        fallback.drawText('No se pudo incorporar la vista previa.', { x: MARGIN, y: PAGE_HEIGHT - 92, size: 9, font: regular, color: MUTED })
+        const x = MARGIN + index * (columnWidth + gap)
+        identityPage.drawText(safeText(`${label}: ${filename}`), { x, y: PAGE_HEIGHT - 130, size: 9, font: bold, color: GRAPHITE, maxWidth: columnWidth })
+        identityPage.drawText('No se pudo incorporar la vista previa.', { x, y: PAGE_HEIGHT - 148, size: 8, font: regular, color: MUTED, maxWidth: columnWidth })
       }
     }
     page = addPage()

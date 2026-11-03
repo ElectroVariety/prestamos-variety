@@ -742,6 +742,12 @@ export default function AdminApp() {
                   <button className="pdf-download-button" onClick={() => void downloadApplicationPdf()} disabled={exporting} aria-label={exporting ? 'Preparando PDF' : 'Descargar PDF de esta solicitud'} title={exporting ? 'Preparando PDF' : 'Descargar PDF de esta solicitud'}>
                     <img className="download-logo" src={`${import.meta.env.BASE_URL}prestamos-variety-logo.jpg`} alt="" aria-hidden="true" />
                   </button>
+                  {(selected.status === 'pending' || selected.status === 'under_review') && (
+                    <button disabled={loading} className="reject-button reject-top-button" onClick={() => void decide('rejected')} aria-label="Rechazar solicitud">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                      <span>Rechazar</span>
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="detail-subsection">
@@ -897,7 +903,7 @@ export default function AdminApp() {
                     />
                     <small>{decisionNote.length}/2000 caracteres</small>
                   </div>
-                  <div className="decision-actions"><button disabled={loading} className="reject-button" onClick={() => void decide('rejected')}>Rechazar</button><button disabled={loading} className="approve-button" onClick={() => void decide('approved')}>Aprobar solicitud</button></div>
+                  <div className="decision-actions"><button disabled={loading} className="approve-button" onClick={() => void decide('approved')}>Aprobar solicitud</button></div>
                 </>
               )}
               <div className="delete-actions"><button disabled={loading} className="delete-button" onClick={() => void deleteApplication()}>Eliminar solicitud y documentos</button></div>

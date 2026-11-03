@@ -71,6 +71,10 @@
 .bulk-export-actions .download-logo { width:34px; height:34px; }
 .detail-header { display:flex; align-items:center; justify-content:space-between; gap:14px; }
 .detail-header-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
+.reject-top-button { display:inline-flex; align-items:center; gap:6px; min-height:42px; border:1px solid #efcaca!important; border-radius:9px; padding:8px 11px; background:#fff!important; color:#bd3434!important; font-weight:700; cursor:pointer; }
+.reject-top-button:hover { background:#fff1f1!important; }
+.reject-top-button svg { width:18px; height:18px; fill:none; stroke:#d43d3d; stroke-width:2.4; stroke-linecap:round; }
+.reject-top-button:disabled { opacity:.55; cursor:wait; }
 .archive-button { border:1px solid var(--brand-silver); border-radius:9px; padding:9px 12px; background:#fff; color:var(--brand-graphite); font-weight:700; cursor:pointer; }
 .archive-button:hover { border-color:var(--brand-electric); background:var(--brand-blue-soft); }
 .archive-button:disabled { opacity:.55; cursor:wait; }
