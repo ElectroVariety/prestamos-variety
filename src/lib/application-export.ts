@@ -322,6 +322,7 @@ export async function buildApplicationPdf(
     const bottom = 34
     const rowHeight = (top - bottom) / dniAttachments.length
     const imageWidth = PAGE_WIDTH - MARGIN * 2
+    let frontImageBottom: number | null = null
 
     for (const [index, { document, bytes }] of dniAttachments.entries()) {
       const label = documentLabels[document.document_type] || document.document_type
@@ -345,7 +346,7 @@ export async function buildApplicationPdf(
         const sourceWidth = converted.width
         const sourceHeight = converted.height
         const rowTop = top - index * rowHeight
-        identityPage.drawText(safeText(label), { x: MARGIN, y: rowTop - 8, size: 10, font: bold, color: BLUE, maxWidth: imageWidth })
+        if (index === 0) identityPage.drawText(safeText(label), { x: MARGIN, y: rowTop - 8, size: 10, font: bold, color: BLUE, maxWidth: imageWidth })
         const maxHeight = rowHeight - 18
         const scale = Math.min(imageWidth / sourceWidth, maxHeight / sourceHeight)
         const width = sourceWidth * scale
@@ -353,9 +354,14 @@ export async function buildApplicationPdf(
         const imageX = (PAGE_WIDTH - width) / 2
         const imageY = rowTop - 18 - height
         identityPage.drawImage(embedded, { x: imageX, y: imageY, width, height })
+        if (index === 0) frontImageBottom = imageY
+        else if (index === 1 && frontImageBottom !== null) {
+          const titleBaseline = (frontImageBottom + imageY + height) / 2 - 4
+          identityPage.drawText(safeText(label), { x: MARGIN, y: titleBaseline, size: 10, font: bold, color: BLUE, maxWidth: imageWidth })
+        } else identityPage.drawText(safeText(label), { x: MARGIN, y: rowTop - 8, size: 10, font: bold, color: BLUE, maxWidth: imageWidth })
       } catch {
         const rowTop = top - index * rowHeight
-        identityPage.drawText(safeText(label), { x: MARGIN, y: rowTop - 8, size: 9, font: bold, color: GRAPHITE, maxWidth: imageWidth })
+        identityPage.drawText(safeText(label), { x: MARGIN, y: index === 1 && frontImageBottom !== null ? (frontImageBottom + rowTop - 18) / 2 - 4 : rowTop - 8, size: 9, font: bold, color: GRAPHITE, maxWidth: imageWidth })
         identityPage.drawText('No se pudo incorporar la vista previa.', { x: MARGIN, y: rowTop - 26, size: 8, font: regular, color: MUTED, maxWidth: imageWidth })
       }
     }
