@@ -570,7 +570,22 @@ export default function AdminApp() {
             <small>Solicitud #{applicationReference(selected.id)} · {formatDateTime(selected.created_at)}</small>
           </section>
 
-          <PdfSection number="01" title="Datos personales">
+          <PdfSection number="01" title="Documentos de identidad">
+            {(['dni_front', 'dni_back'] as const).map((type) => {
+              const document = selected.documents.find((item) => item.document_type === type)
+              return <PdfField key={type} label={documentLabels[type]} value={document?.original_filename || 'No adjuntado'} />
+            })}
+          </PdfSection>
+
+          <PdfSection number="02" title="Tu préstamo">
+            <PdfField label="Monto solicitado" value={money(selected.loan_amount)} />
+            <PdfField label="Modalidad de cuotas" value={`${selected.installment_count} cuotas ${selected.loan_frequency === 'weekly' ? 'semanales' : selected.loan_frequency === 'fortnightly' ? 'quincenales' : 'mensuales'}`} />
+            <PdfField label="Valor de cada cuota" value={money(selected.installment_amount)} />
+            <PdfField label="Total estimado a pagar" value={money(selected.total_to_pay)} />
+            <PdfField label="¿Para qué necesita el préstamo?" value={selected.loan_purpose} />
+          </PdfSection>
+
+          <PdfSection number="03" title="Datos personales">
             <PdfField label="Nombre y apellido" value={selected.full_name} />
             <PdfField label="DNI" value={selected.dni} />
             <PdfField label="¿Tiene el DNI actualizado?" value={selected.dni_updated ? 'Sí' : 'No'} />
@@ -586,14 +601,14 @@ export default function AdminApp() {
             </>}
           </PdfSection>
 
-          <PdfSection number="02" title="Domicilio">
+          <PdfSection number="04" title="Domicilio">
             <PdfField label="Calle y número" value={selected.address} />
             <PdfField label="Entre calles" value={selected.between_streets} />
             <PdfField label="Localidad" value={selected.locality} />
             <PdfField label="Situación de vivienda" value={housingLabels[selected.housing_type] || selected.housing_type} />
           </PdfSection>
 
-          <PdfSection number="03" title="Comprobante de domicilio">
+          <PdfSection number="05" title="Comprobante de domicilio">
             <PdfField label="Servicios o comprobantes declarados" value={selected.service_types?.length ? selected.service_types.map((service) => serviceLabels[service] || service).join(', ') : 'Ninguno informado'} />
             {selected.service_types?.some((service) => service !== 'none') && <>
               <PdfField label="¿El servicio está a nombre de la persona?" value={selected.has_service_in_own_name ? 'Sí' : 'No'} />
@@ -605,7 +620,7 @@ export default function AdminApp() {
             </>}
           </PdfSection>
 
-          <PdfSection number="04" title="Situación financiera">
+          <PdfSection number="06" title="Situación financiera">
             <PdfField label="¿Tiene deudas actualmente?" value={selected.has_debts ? 'Sí' : 'No'} />
             {selected.has_debts && <>
               <PdfField label="Motivo de la deuda" value={selected.debt_reason} />
@@ -613,7 +628,7 @@ export default function AdminApp() {
             </>}
           </PdfSection>
 
-          <PdfSection number="05" title="Trabajo e ingresos">
+          <PdfSection number="07" title="Trabajo e ingresos">
             {selected.incomes.length ? selected.incomes.map((income, index) => (
               <div className="pdf-income" key={String(income.source_type) + index}>
                 <h3>{incomeLabels[String(income.source_type)] || String(income.source_type)}</h3>
@@ -625,14 +640,6 @@ export default function AdminApp() {
                 })}
               </div>
             )) : <PdfField label="Fuentes de ingreso" value="Sin datos de ingresos" />}
-          </PdfSection>
-
-          <PdfSection number="06" title="Tu préstamo">
-            <PdfField label="Monto solicitado" value={money(selected.loan_amount)} />
-            <PdfField label="Modalidad de cuotas" value={`${selected.installment_count} cuotas ${selected.loan_frequency === 'weekly' ? 'semanales' : selected.loan_frequency === 'fortnightly' ? 'quincenales' : 'mensuales'}`} />
-            <PdfField label="Valor de cada cuota" value={money(selected.installment_amount)} />
-            <PdfField label="Total estimado a pagar" value={money(selected.total_to_pay)} />
-            <PdfField label="¿Para qué necesita el préstamo?" value={selected.loan_purpose} />
           </PdfSection>
 
           <section className="pdf-consents">
@@ -738,6 +745,26 @@ export default function AdminApp() {
                 </div>
               </div>
               <div className="detail-subsection">
+                <h3>Frente y dorso de tu DNI</h3>
+                {(['dni_front', 'dni_back'] as const).map((type) => {
+                  const document = selected.documents.find((item) => item.document_type === type)
+                  return document ? (
+                    <a className="document-row" key={document.id} href={document.signed_url || '#'} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); void openDocument(selected.id, document) }}>
+                      <span>▧</span><span><b>{documentLabels[type]}</b><small>{document.original_filename} · {Math.max(1, Math.round(document.file_size_bytes / 1024))} KB</small></span><strong>Ver ↗</strong>
+                    </a>
+                  ) : <p key={type}>{documentLabels[type]}: no adjuntado</p>
+                })}
+              </div>
+              <div className="detail-subsection">
+                <h3>Préstamo solicitado</h3>
+                <div className="detail-grid">
+                  <div><small>Monto solicitado</small><b>{money(selected.loan_amount)}</b></div>
+                  <div><small>Modalidad de cuotas</small><b>{selected.installment_count} cuotas {selected.loan_frequency === 'weekly' ? 'semanales' : selected.loan_frequency === 'fortnightly' ? 'quincenales' : 'mensuales'} de {money(selected.installment_amount)}</b></div>
+                  <div><small>Total estimado a pagar</small><b>{money(selected.total_to_pay)}</b></div>
+                  <div className="detail-wide"><small>¿Para qué necesita el préstamo?</small><b>{selected.loan_purpose}</b></div>
+                </div>
+              </div>
+              <div className="detail-subsection">
                 <h3>Datos personales</h3>
                 <div className="detail-grid">
                   <div><small>Nombre y apellido</small><b>{selected.full_name}</b></div>
@@ -804,15 +831,6 @@ export default function AdminApp() {
                 )) : <p>Sin datos de ingresos.</p>}
               </div>
               <div className="detail-subsection">
-                <h3>Préstamo solicitado</h3>
-                <div className="detail-grid">
-                  <div><small>Monto solicitado</small><b>{money(selected.loan_amount)}</b></div>
-                  <div><small>Modalidad de cuotas</small><b>{selected.installment_count} cuotas {selected.loan_frequency === 'weekly' ? 'semanales' : selected.loan_frequency === 'fortnightly' ? 'quincenales' : 'mensuales'} de {money(selected.installment_amount)}</b></div>
-                  <div><small>Total estimado a pagar</small><b>{money(selected.total_to_pay)}</b></div>
-                  <div className="detail-wide"><small>¿Para qué necesita el préstamo?</small><b>{selected.loan_purpose}</b></div>
-                </div>
-              </div>
-              <div className="detail-subsection">
                 <h3>Consentimientos</h3>
                 <div className="detail-grid">
                   <div><small>Aceptó el tratamiento de datos</small><b>{selected.privacy_accepted ? 'Sí' : 'No registrado'}</b></div>
@@ -821,8 +839,8 @@ export default function AdminApp() {
                 </div>
               </div>
               <div className="detail-subsection">
-                <h3>Documentación <span>{selected.documents.length}</span></h3>
-                {selected.documents.length ? selected.documents.map((document) => (
+                <h3>Otra documentación <span>{selected.documents.filter((document) => !['dni_front', 'dni_back'].includes(document.document_type)).length}</span></h3>
+                {selected.documents.filter((document) => !['dni_front', 'dni_back'].includes(document.document_type)).length ? selected.documents.filter((document) => !['dni_front', 'dni_back'].includes(document.document_type)).map((document) => (
                   <a className="document-row" key={document.id} href={document.signed_url || '#'} target="_blank" rel="noreferrer" onClick={(event) => { event.preventDefault(); void openDocument(selected.id, document) }}>
                     <span>▧</span><span><b>{documentLabels[document.document_type] || document.document_type}</b><small>{document.original_filename} · {Math.max(1, Math.round(document.file_size_bytes / 1024))} KB</small></span><strong>Ver ↗</strong>
                   </a>

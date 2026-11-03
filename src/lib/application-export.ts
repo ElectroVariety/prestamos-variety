@@ -307,11 +307,71 @@ export async function buildApplicationPdf(
     drawFields(fields)
   }
 
+  const dniAttachments = attachments
+    .filter(({ document }) => ['dni_front', 'dni_back'].includes(document.document_type))
+    .sort((a, b) => ['dni_front', 'dni_back'].indexOf(a.document.document_type) - ['dni_front', 'dni_back'].indexOf(b.document.document_type))
+  if (dniAttachments.length) {
+    ensureRoom(45)
+    y -= 7
+    page.drawRectangle({ x: MARGIN, y: y - 19, width: 24, height: 24, color: PALE_BLUE })
+    page.drawText('01', { x: MARGIN + 3, y: y - 11, size: 7.5, font: bold, color: BLUE })
+    page.drawText('Frente y dorso de tu DNI', { x: MARGIN + 33, y: y - 11, size: 12, font: bold, color: GRAPHITE })
+    y -= 31
+
+    for (const { document, bytes } of dniAttachments) {
+      const label = documentLabels[document.document_type] || document.document_type
+      const filename = safeFilename(document.original_filename)
+      const lowerName = filename.toLowerCase()
+      if (lowerName.endsWith('.pdf') || bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+        const cover = addPage()
+        cover.drawText(safeText(label), { x: MARGIN, y: PAGE_HEIGHT - 60, size: 13, font: bold, color: GRAPHITE })
+        cover.drawText(safeText(filename), { x: MARGIN, y: PAGE_HEIGHT - 78, size: 8, font: regular, color: MUTED })
+        try {
+          const sourcePdf = await PDFDocument.load(bytes)
+          const copied = await pdf.copyPages(sourcePdf, sourcePdf.getPageIndices())
+          copied.forEach((pdfPage) => pdf.addPage(pdfPage))
+        } catch {
+          cover.drawText('No se pudo representar este documento.', { x: MARGIN, y: PAGE_HEIGHT - 102, size: 9, font: regular, color: MUTED })
+        }
+        continue
+      }
+      try {
+        const mime = lowerName.endsWith('.png') ? 'image/png' : lowerName.endsWith('.webp') ? 'image/webp' : 'image/jpeg'
+        const converted = mime === 'image/webp' ? await imageAsJpeg(bytes, mime) : null
+        const imageBytes = converted?.bytes || bytes
+        const embedded = mime === 'image/png' ? await pdf.embedPng(imageBytes) : await pdf.embedJpg(imageBytes)
+        const imageWidth = converted?.width || embedded.width
+        const imageHeight = converted?.height || embedded.height
+        const imagePage = addPage()
+        imagePage.drawText(safeText(label), { x: MARGIN, y: PAGE_HEIGHT - 60, size: 13, font: bold, color: GRAPHITE })
+        imagePage.drawText(safeText(filename), { x: MARGIN, y: PAGE_HEIGHT - 77, size: 8, font: regular, color: MUTED })
+        const maxWidth = PAGE_WIDTH - MARGIN * 2
+        const maxHeight = PAGE_HEIGHT - 145
+        const scale = Math.min(maxWidth / imageWidth, maxHeight / imageHeight)
+        const width = imageWidth * scale
+        const height = imageHeight * scale
+        imagePage.drawImage(embedded, { x: (PAGE_WIDTH - width) / 2, y: Math.max(40, (PAGE_HEIGHT - height) / 2 - 20), width, height })
+      } catch {
+        const fallback = addPage()
+        fallback.drawText(safeText(`${label}: ${filename}`), { x: MARGIN, y: PAGE_HEIGHT - 70, size: 12, font: bold, color: GRAPHITE })
+        fallback.drawText('No se pudo incorporar la vista previa.', { x: MARGIN, y: PAGE_HEIGHT - 92, size: 9, font: regular, color: MUTED })
+      }
+    }
+    page = addPage()
+  }
+
   const state = (value: boolean) => value ? 'Si' : 'No'
   const serviceNames = application.service_types?.length
     ? application.service_types.map((service) => serviceLabels[service] || service).join(', ')
     : 'Ninguno informado'
-  drawSection('01', 'Datos personales', [
+  drawSection('02', 'Tu prestamo', [
+    ['Monto solicitado', money(application.loan_amount)],
+    ['Modalidad de cuotas', `${application.installment_count} cuotas ${application.loan_frequency === 'weekly' ? 'semanales' : application.loan_frequency === 'fortnightly' ? 'quincenales' : 'mensuales'}`],
+    ['Valor de cada cuota', money(application.installment_amount)],
+    ['Total estimado a pagar', money(application.total_to_pay)],
+    ['Para que necesita el prestamo', application.loan_purpose],
+  ])
+  drawSection('03', 'Datos personales', [
     ['Nombre y apellido', application.full_name],
     ['DNI', application.dni],
     ['DNI actualizado', state(application.dni_updated)],
@@ -326,13 +386,13 @@ export async function buildApplicationPdf(
       ['Vinculo con quien recomendo', application.referrer_relationship],
     ] as Array<[string, unknown]> : []),
   ])
-  drawSection('02', 'Domicilio', [
+  drawSection('04', 'Domicilio', [
     ['Calle y numero', application.address],
     ['Entre calles', application.between_streets],
     ['Localidad', application.locality],
     ['Situacion de vivienda', housingLabels[application.housing_type] || application.housing_type],
   ])
-  drawSection('03', 'Comprobante de domicilio', [
+  drawSection('05', 'Comprobante de domicilio', [
     ['Servicios o comprobantes declarados', serviceNames],
     ...(application.service_types?.some((service) => service !== 'none') ? [
       ['Servicio a nombre de la persona', state(application.has_service_in_own_name)],
@@ -343,7 +403,7 @@ export async function buildApplicationPdf(
       ] as Array<[string, unknown]> : []),
     ] as Array<[string, unknown]> : []),
   ])
-  drawSection('04', 'Situacion financiera', [
+  drawSection('06', 'Situacion financiera', [
     ['Tiene deudas actualmente', state(application.has_debts)],
     ...(application.has_debts ? [
       ['Motivo de la deuda', application.debt_reason],
@@ -354,7 +414,7 @@ export async function buildApplicationPdf(
   ensureRoom(55)
   y -= 7
   page.drawRectangle({ x: MARGIN, y: y - 19, width: 24, height: 24, color: PALE_BLUE })
-  page.drawText('05', { x: MARGIN + 3, y: y - 11, size: 7.5, font: bold, color: BLUE })
+  page.drawText('07', { x: MARGIN + 3, y: y - 11, size: 7.5, font: bold, color: BLUE })
   page.drawText('Trabajo e ingresos', { x: MARGIN + 33, y: y - 11, size: 12, font: bold, color: GRAPHITE })
   y -= 31
   if (!application.incomes.length) drawFields([['Fuentes de ingreso', 'Sin datos de ingresos']])
@@ -371,20 +431,14 @@ export async function buildApplicationPdf(
     drawFields(details)
     y -= 6
   }
-  drawSection('06', 'Tu prestamo', [
-    ['Monto solicitado', money(application.loan_amount)],
-    ['Modalidad de cuotas', `${application.installment_count} cuotas ${application.loan_frequency === 'weekly' ? 'semanales' : application.loan_frequency === 'fortnightly' ? 'quincenales' : 'mensuales'}`],
-    ['Valor de cada cuota', money(application.installment_amount)],
-    ['Total estimado a pagar', money(application.total_to_pay)],
-    ['Para que necesita el prestamo', application.loan_purpose],
-  ])
-  drawSection('07', 'Consentimientos', [
+  drawSection('08', 'Consentimientos', [
     ['Tratamiento de datos', application.privacy_accepted ? 'Aceptado' : 'No registrado'],
     ['Notificacion del resultado por WhatsApp', application.whatsapp_rejection_opt_in ? 'Aceptada' : 'No aceptada'],
     ...(application.whatsapp_rejection_opt_in_at ? [['Consentimiento WhatsApp registrado', formatDateTime(application.whatsapp_rejection_opt_in_at)] as [string, unknown]] : []),
   ])
 
-  if (attachments.length) {
+  const otherAttachments = attachments.filter(({ document }) => !['dni_front', 'dni_back'].includes(document.document_type))
+  if (otherAttachments.length) {
     ensureRoom(65)
     y -= 8
     page.drawRectangle({ x: MARGIN, y: y - 19, width: 24, height: 24, color: PALE_BLUE })
@@ -392,7 +446,7 @@ export async function buildApplicationPdf(
     page.drawText('Documentacion adjunta', { x: MARGIN + 33, y: y - 11, size: 12, font: bold, color: GRAPHITE })
     y -= 31
 
-    for (const attachment of attachments) {
+    for (const attachment of otherAttachments) {
       const { document, bytes } = attachment
       const label = documentLabels[document.document_type] || document.document_type
       const filename = safeFilename(document.original_filename)
