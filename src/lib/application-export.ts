@@ -169,17 +169,22 @@ function drawText(page: PDFPage, text: string, x: number, y: number, size: numbe
   page.drawText(safeText(text), { x, y, size, font, color, maxWidth: PAGE_WIDTH - x - MARGIN })
 }
 
-async function imageAsJpeg(bytes: Uint8Array, mimeType: string) {
+async function imageAsJpeg(bytes: Uint8Array, mimeType: string, rotatePortrait = false) {
   const blob = new Blob([bytes.slice().buffer], { type: mimeType })
-  const bitmap = await createImageBitmap(blob)
+  const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' })
+  const rotate = rotatePortrait && bitmap.height > bitmap.width
   const canvas = document.createElement('canvas')
-  canvas.width = bitmap.width
-  canvas.height = bitmap.height
+  canvas.width = rotate ? bitmap.height : bitmap.width
+  canvas.height = rotate ? bitmap.width : bitmap.height
   const context = canvas.getContext('2d')
   if (!context) throw new Error('No se pudo procesar una imagen adjunta.')
   context.fillStyle = '#ffffff'
   context.fillRect(0, 0, canvas.width, canvas.height)
-  context.drawImage(bitmap, 0, 0)
+  if (rotate) {
+    context.translate(canvas.width / 2, canvas.height / 2)
+    context.rotate(-Math.PI / 2)
+    context.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2)
+  } else context.drawImage(bitmap, 0, 0)
   bitmap.close()
   const converted = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((result) => result ? resolve(result) : reject(new Error('No se pudo convertir una imagen adjunta.')), 'image/jpeg', 0.9)
@@ -335,14 +340,19 @@ export async function buildApplicationPdf(
       }
       try {
         const mime = lowerName.endsWith('.png') ? 'image/png' : lowerName.endsWith('.webp') ? 'image/webp' : 'image/jpeg'
-        const converted = mime === 'image/webp' ? await imageAsJpeg(bytes, mime) : null
-        const imageBytes = converted?.bytes || bytes
-        const embedded = mime === 'image/png' ? await pdf.embedPng(imageBytes) : await pdf.embedJpg(imageBytes)
+        const converted = await imageAsJpeg(bytes, mime, true)
+        const embedded = await pdf.embedJpg(converted.bytes)
+        const sourceWidth = converted.width
+        const sourceHeight = converted.height
         const rowTop = top - index * rowHeight
         identityPage.drawText(safeText(label), { x: MARGIN, y: rowTop - 8, size: 10, font: bold, color: BLUE, maxWidth: imageWidth })
-        const imageHeight = rowHeight - 18
-        const imageY = rowTop - 18 - imageHeight
-        identityPage.drawImage(embedded, { x: MARGIN, y: imageY, width: imageWidth, height: imageHeight })
+        const maxHeight = rowHeight - 18
+        const scale = Math.min(imageWidth / sourceWidth, maxHeight / sourceHeight)
+        const width = sourceWidth * scale
+        const height = sourceHeight * scale
+        const imageX = (PAGE_WIDTH - width) / 2
+        const imageY = rowTop - 18 - height
+        identityPage.drawImage(embedded, { x: imageX, y: imageY, width, height })
       } catch {
         const rowTop = top - index * rowHeight
         identityPage.drawText(safeText(label), { x: MARGIN, y: rowTop - 8, size: 9, font: bold, color: GRAPHITE, maxWidth: imageWidth })
