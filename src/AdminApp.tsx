@@ -450,13 +450,17 @@ export default function AdminApp() {
   }
 
   const startPdfPreview = () => {
-    const android = /Android/i.test(navigator.userAgent)
-    const androidWindow = android ? window.open('about:blank', '_blank') : null
-    if (android && !androidWindow) {
+    // Android browsers can hide the Android token when "Desktop site" is enabled.
+    // Touch/coarse-pointer detection keeps PDF previews out of unsupported iframes.
+    const mobileBrowser = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+      || navigator.maxTouchPoints > 0
+      || window.matchMedia('(pointer: coarse)').matches
+    const previewWindow = mobileBrowser ? window.open('about:blank', '_blank') : null
+    if (mobileBrowser && !previewWindow) {
       setError('El navegador bloqueó la pestaña del PDF. Permití ventanas emergentes e intentá de nuevo.')
       return
     }
-    void previewApplicationPdf(androidWindow)
+    void previewApplicationPdf(previewWindow)
   }
 
   const closePdfPreview = () => {
