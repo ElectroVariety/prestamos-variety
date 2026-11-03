@@ -320,12 +320,10 @@ export async function buildApplicationPdf(
 
     for (const [index, { document, bytes }] of dniAttachments.entries()) {
       const label = documentLabels[document.document_type] || document.document_type
-      const filename = safeFilename(document.original_filename)
-      const lowerName = filename.toLowerCase()
+      const lowerName = document.original_filename.toLowerCase()
       if (lowerName.endsWith('.pdf') || bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
         const cover = addPage()
         cover.drawText(safeText(label), { x: MARGIN, y: PAGE_HEIGHT - 60, size: 13, font: bold, color: GRAPHITE })
-        cover.drawText(safeText(filename), { x: MARGIN, y: PAGE_HEIGHT - 78, size: 8, font: regular, color: MUTED })
         try {
           const sourcePdf = await PDFDocument.load(bytes)
           const copied = await pdf.copyPages(sourcePdf, sourcePdf.getPageIndices())
@@ -342,13 +340,12 @@ export async function buildApplicationPdf(
         const embedded = mime === 'image/png' ? await pdf.embedPng(imageBytes) : await pdf.embedJpg(imageBytes)
         const rowTop = top - index * rowHeight
         identityPage.drawText(safeText(label), { x: MARGIN, y: rowTop - 8, size: 10, font: bold, color: BLUE, maxWidth: imageWidth })
-        identityPage.drawText(safeText(filename), { x: MARGIN, y: rowTop - 23, size: 7, font: regular, color: MUTED, maxWidth: imageWidth })
-        const imageHeight = rowHeight - 28
-        const imageY = rowTop - 28 - imageHeight
+        const imageHeight = rowHeight - 18
+        const imageY = rowTop - 18 - imageHeight
         identityPage.drawImage(embedded, { x: MARGIN, y: imageY, width: imageWidth, height: imageHeight })
       } catch {
         const rowTop = top - index * rowHeight
-        identityPage.drawText(safeText(`${label}: ${filename}`), { x: MARGIN, y: rowTop - 8, size: 9, font: bold, color: GRAPHITE, maxWidth: imageWidth })
+        identityPage.drawText(safeText(label), { x: MARGIN, y: rowTop - 8, size: 9, font: bold, color: GRAPHITE, maxWidth: imageWidth })
         identityPage.drawText('No se pudo incorporar la vista previa.', { x: MARGIN, y: rowTop - 26, size: 8, font: regular, color: MUTED, maxWidth: imageWidth })
       }
     }
