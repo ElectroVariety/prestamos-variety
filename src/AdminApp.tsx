@@ -125,6 +125,15 @@ export default function AdminApp() {
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState('')
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
+  const applicationDetailRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!selected || detailLoading || !window.matchMedia('(max-width: 760px)').matches) return
+    const frame = window.requestAnimationFrame(() => {
+      applicationDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [selected, detailLoading])
 
   const openApplication = async (application: ApplicationSummary) => {
     const requestId = ++selectedRequestId.current
@@ -728,7 +737,7 @@ export default function AdminApp() {
             </div>
           ))}
         </section>
-        <section className="application-detail">
+        <section className="application-detail" ref={applicationDetailRef}>
           {!selected ? <div className="admin-empty detail-placeholder">{detailLoading ? 'Cargando los datos de la solicitud…' : 'Elegí una solicitud para ver sus datos y documentación.'}</div> : (
             <>
               <div className="detail-header">
