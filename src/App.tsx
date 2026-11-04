@@ -246,6 +246,9 @@ function Section({
 
 function App() {
   const deliveryGalleryRef = useRef<HTMLDivElement>(null)
+  const deliveryModalCloseRef = useRef<HTMLButtonElement>(null)
+  const galleryInteractionPauseUntilRef = useRef(0)
+  const [selectedDeliveryPhoto, setSelectedDeliveryPhoto] = useState<string | null>(null)
   const [housing, setHousing] = useState('')
   const [referrerStatus, setReferrerStatus] = useState('')
   const [electroVarietyClientStatus, setElectroVarietyClientStatus] = useState('')
@@ -267,6 +270,52 @@ function App() {
   const [trackingCodeCopied, setTrackingCodeCopied] = useState(false)
 
   const selectedPlan = loanPlans[loanAmount][loanFrequency]
+
+  useEffect(() => {
+    const gallery = deliveryGalleryRef.current
+    if (!gallery || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const gallerySection = gallery.parentElement
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible'
+        || gallerySection?.matches(':hover')
+        || gallerySection?.contains(document.activeElement)
+        || Date.now() < galleryInteractionPauseUntilRef.current) return
+
+      const maxScroll = gallery.scrollWidth - gallery.clientWidth
+      if (maxScroll <= 4) return
+
+      if (gallery.scrollLeft >= maxScroll - 8) {
+        gallery.scrollTo({ left: 0, behavior: 'smooth' })
+      } else {
+        const firstCard = gallery.querySelector<HTMLElement>('.delivery-gallery-card')
+        const step = (firstCard?.getBoundingClientRect().width ?? gallery.clientWidth * 0.8) + 10
+        gallery.scrollBy({ left: step, behavior: 'smooth' })
+      }
+    }, 4800)
+
+    return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    if (!selectedDeliveryPhoto) return
+
+    const previousActiveElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    deliveryModalCloseRef.current?.focus()
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedDeliveryPhoto(null)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      previousActiveElement?.focus()
+    }
+  }, [selectedDeliveryPhoto])
 
   const scrollDeliveryGallery = (direction: -1 | 1) => {
     const gallery = deliveryGalleryRef.current
@@ -499,19 +548,37 @@ function App() {
             <button type="button" onClick={() => scrollDeliveryGallery(1)} aria-label="Ver más entregas">›</button>
           </div>
         </div>
-        <div className="delivery-gallery-track" ref={deliveryGalleryRef} role="list" aria-label="Galería de entregas de préstamos">
+        <div
+          className="delivery-gallery-track"
+          ref={deliveryGalleryRef}
+          role="list"
+          aria-label="Galería de entregas de préstamos"
+          onTouchStart={() => { galleryInteractionPauseUntilRef.current = Date.now() + 6500 }}
+          onWheel={() => { galleryInteractionPauseUntilRef.current = Date.now() + 6500 }}
+        >
           {deliveryPhotos.map((photo, index) => (
             <figure className="delivery-gallery-card" role="listitem" key={photo}>
-              <img
-                src={`${import.meta.env.BASE_URL}entregas/${photo}`}
-                alt={`Entrega de Préstamos Variety ${index + 1}; rostro y datos del comprobante protegidos`}
-                loading="lazy"
-                decoding="async"
-              />
+              <button type="button" className="delivery-gallery-image-button" onClick={() => setSelectedDeliveryPhoto(photo)} aria-label={`Ampliar imagen de entrega ${index + 1}`}>
+                <img
+                  src={`${import.meta.env.BASE_URL}entregas/${photo}`}
+                  alt={`Entrega de Préstamos Variety ${index + 1}; rostro y datos del comprobante protegidos`}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </button>
             </figure>
           ))}
         </div>
       </section>
+
+      {selectedDeliveryPhoto && (
+        <div className="delivery-lightbox" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedDeliveryPhoto(null) }}>
+          <section className="delivery-lightbox-dialog" role="dialog" aria-modal="true" aria-label="Imagen ampliada de entrega">
+            <button ref={deliveryModalCloseRef} type="button" className="delivery-lightbox-close" onClick={() => setSelectedDeliveryPhoto(null)} aria-label="Cerrar imagen ampliada">×</button>
+            <img src={`${import.meta.env.BASE_URL}entregas/${selectedDeliveryPhoto}`} alt="Entrega de Préstamos Variety; rostro y datos del comprobante protegidos" />
+          </section>
+        </div>
+      )}
 
       <form
         className={`loan-form${showRequiredErrors ? ' show-required-errors' : ''}`}

@@ -674,11 +674,22 @@ body { background: var(--brand-pearl); color: var(--brand-graphite); }
 .delivery-gallery-controls button:focus-visible { outline:3px solid #008fff55; outline-offset:2px; }
 .delivery-gallery-track { display:flex; gap:10px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:thin; scrollbar-color:var(--brand-silver) transparent; }
 .delivery-gallery-card { flex:0 0 clamp(138px,21%,180px); aspect-ratio:4/5; margin:0; overflow:hidden; border:1px solid #e0e5eb; border-radius:10px; background:var(--brand-pearl); scroll-snap-align:start; }
-.delivery-gallery-card img { display:block; width:100%; height:100%; object-fit:cover; }
+.delivery-gallery-image-button { display:block; width:100%; height:100%; overflow:hidden; border:0; padding:0; background:transparent; cursor:zoom-in; }
+.delivery-gallery-image-button img { display:block; width:100%; height:100%; object-fit:cover; transition:transform .2s ease; }
+.delivery-gallery-image-button:hover img { transform:scale(1.035); }
+.delivery-gallery-image-button:focus-visible { position:relative; outline:3px solid var(--brand-electric); outline-offset:-3px; }
+.delivery-lightbox { position:fixed; z-index:1200; inset:0; display:grid; place-items:center; padding:24px; background:#101820e8; }
+.delivery-lightbox-dialog { position:relative; display:grid; place-items:center; width:min(100%,900px); height:min(94vh,1100px); }
+.delivery-lightbox-dialog img { display:block; max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; box-shadow:0 16px 60px #0007; }
+.delivery-lightbox-close { position:absolute; z-index:1; top:8px; right:8px; display:grid; place-items:center; width:42px; height:42px; border:1px solid #ffffff70; border-radius:50%; background:#17212de8; color:#fff; font-size:29px; line-height:1; cursor:pointer; }
+.delivery-lightbox-close:focus-visible { outline:3px solid #fff; outline-offset:2px; }
 @media(max-width:640px) {
   .delivery-gallery { padding:12px; }
   .delivery-gallery-heading h2 { font-size:14px; }
   .delivery-gallery-card { flex-basis:clamp(145px,43%,175px); }
+  .delivery-lightbox { padding:12px; }
+  .delivery-lightbox-dialog { width:100%; height:92vh; }
+  .delivery-lightbox-close { top:4px; right:4px; }
 }
 @media(prefers-reduced-motion:reduce) {
   .delivery-gallery-track { scroll-behavior:auto; }
