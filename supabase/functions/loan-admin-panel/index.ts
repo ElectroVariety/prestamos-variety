@@ -327,6 +327,7 @@ Deno.serve(async (request: Request) => {
         decided_at: new Date().toISOString(),
         decided_by: authData.user.id,
         admin_notes: adminNotes || null,
+        ...(status === "approved" ? { archived_at: null, archived_by: null } : {}),
       })
       .eq("id", id)
       .in("status", ["pending", "under_review"])

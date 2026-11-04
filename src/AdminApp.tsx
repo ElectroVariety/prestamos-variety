@@ -278,7 +278,7 @@ export default function AdminApp() {
         }
         setNotice(deliveryNotice[String(delivery)] || 'Solicitud rechazada.')
       } else {
-        setNotice('Solicitud aprobada.')
+        setNotice('Solicitud aprobada. Si estaba archivada, ahora aparece en Aprobadas.')
       }
       if (status === 'approved') {
         setWhatsAppApplicant(selected)
