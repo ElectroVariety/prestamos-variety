@@ -663,6 +663,26 @@ body { background: var(--brand-pearl); color: var(--brand-graphite); }
 .hero { color: var(--brand-pearl); background: linear-gradient(132deg, var(--brand-graphite) 0%, #303b4a 72%, #006fc6 150%); border: 1px solid #343f4d; box-shadow: 0 14px 32px #252b351d; }
 .hero h1 { color: #fff; }
 .eyebrow { color: #9bd4ff; }
+
+.delivery-gallery { margin-top:14px; padding:14px 16px 15px; border:1px solid var(--brand-silver); border-radius:15px; background:#fff; }
+.delivery-gallery-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:11px; }
+.delivery-gallery-heading h2 { margin:0; color:var(--brand-graphite); font-family:'Manrope',sans-serif; font-size:15px; line-height:1.3; }
+.delivery-gallery-heading p { margin:3px 0 0; color:#5f6c7a; font-size:11px; }
+.delivery-gallery-controls { display:flex; flex:none; gap:6px; }
+.delivery-gallery-controls button { display:grid; place-items:center; width:32px; height:32px; border:1px solid var(--brand-silver); border-radius:50%; background:#fff; color:var(--brand-graphite); font-size:23px; line-height:1; cursor:pointer; }
+.delivery-gallery-controls button:hover { border-color:var(--brand-electric); background:var(--brand-blue-soft); }
+.delivery-gallery-controls button:focus-visible { outline:3px solid #008fff55; outline-offset:2px; }
+.delivery-gallery-track { display:flex; gap:10px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:thin; scrollbar-color:var(--brand-silver) transparent; }
+.delivery-gallery-card { flex:0 0 clamp(138px,21%,180px); aspect-ratio:4/5; margin:0; overflow:hidden; border:1px solid #e0e5eb; border-radius:10px; background:var(--brand-pearl); scroll-snap-align:start; }
+.delivery-gallery-card img { display:block; width:100%; height:100%; object-fit:cover; }
+@media(max-width:640px) {
+  .delivery-gallery { padding:12px; }
+  .delivery-gallery-heading h2 { font-size:14px; }
+  .delivery-gallery-card { flex-basis:clamp(145px,43%,175px); }
+}
+@media(prefers-reduced-motion:reduce) {
+  .delivery-gallery-track { scroll-behavior:auto; }
+}
 .hero > p { color: #e6edf5; }
 .notice { border-color: #b8c3d180; background: #f4f7fa12; color: #f4f7fa; }
 .notice b { color: #fff; }

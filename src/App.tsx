@@ -99,6 +99,20 @@ const incomeLabels: Record<IncomeType, string> = {
   other: 'Otros ingresos',
 }
 
+const deliveryPhotos = [
+  'entrega-1.jpeg',
+  'entrega-2.jpeg',
+  'entrega-3.jpeg',
+  'entrega-4.jpeg',
+  'entrega-5.jpeg',
+  'entrega-chatgpt-1.jpg',
+  'entrega-chatgpt-2.jpg',
+  'entrega-chatgpt-3.jpg',
+  'entrega-chatgpt-4.jpg',
+  'entrega-chatgpt-5.jpg',
+  'entrega-chatgpt-6.jpg',
+]
+
 const formatMoney = (value: number) =>
   new Intl.NumberFormat('es-AR', {
     style: 'currency',
@@ -231,6 +245,7 @@ function Section({
 }
 
 function App() {
+  const deliveryGalleryRef = useRef<HTMLDivElement>(null)
   const [housing, setHousing] = useState('')
   const [referrerStatus, setReferrerStatus] = useState('')
   const [electroVarietyClientStatus, setElectroVarietyClientStatus] = useState('')
@@ -252,6 +267,12 @@ function App() {
   const [trackingCodeCopied, setTrackingCodeCopied] = useState(false)
 
   const selectedPlan = loanPlans[loanAmount][loanFrequency]
+
+  const scrollDeliveryGallery = (direction: -1 | 1) => {
+    const gallery = deliveryGalleryRef.current
+    if (!gallery) return
+    gallery.scrollBy({ left: direction * gallery.clientWidth * 0.8, behavior: 'smooth' })
+  }
 
   const handleFilesChange = (key: string, files: File[]) => {
     setSelectedFiles((current) => ({ ...current, [key]: files }))
@@ -466,6 +487,31 @@ function App() {
           Los campos marcados con <b>*</b> son obligatorios.
         </div>
       </div>
+
+      <section className="delivery-gallery" aria-labelledby="delivery-gallery-title">
+        <div className="delivery-gallery-heading">
+          <div>
+            <h2 id="delivery-gallery-title">Un impulso para tus proyectos</h2>
+            <p>Conocé algunas entregas de Préstamos Variety</p>
+          </div>
+          <div className="delivery-gallery-controls">
+            <button type="button" onClick={() => scrollDeliveryGallery(-1)} aria-label="Ver entregas anteriores">‹</button>
+            <button type="button" onClick={() => scrollDeliveryGallery(1)} aria-label="Ver más entregas">›</button>
+          </div>
+        </div>
+        <div className="delivery-gallery-track" ref={deliveryGalleryRef} role="list" aria-label="Galería de entregas de préstamos">
+          {deliveryPhotos.map((photo, index) => (
+            <figure className="delivery-gallery-card" role="listitem" key={photo}>
+              <img
+                src={`${import.meta.env.BASE_URL}entregas/${photo}`}
+                alt={`Entrega de Préstamos Variety ${index + 1}; rostro y datos del comprobante protegidos`}
+                loading="lazy"
+                decoding="async"
+              />
+            </figure>
+          ))}
+        </div>
+      </section>
 
       <form
         className={`loan-form${showRequiredErrors ? ' show-required-errors' : ''}`}
