@@ -15,7 +15,15 @@ const labels: Record<StatusResult['status'], string> = {
   rejected: 'Rechazada',
 }
 
-export default function StatusLookup({ initialCode }: { initialCode?: string | null }) {
+export default function StatusLookup({
+  initialCode,
+  rememberedCode,
+  onForgetRememberedCode,
+}: {
+  initialCode?: string | null
+  rememberedCode?: string | null
+  onForgetRememberedCode?: () => void
+}) {
   const [code, setCode] = useState(initialCode ?? '')
   const [result, setResult] = useState<StatusResult | null>(null)
   const [error, setError] = useState('')
@@ -80,6 +88,7 @@ export default function StatusLookup({ initialCode }: { initialCode?: string | n
       setCode('')
       setDniConfirmation('')
       setDeletionOpen(false)
+      if (rememberedCode && rememberedCode === code.trim().toUpperCase()) onForgetRememberedCode?.()
     } catch (cause) {
       window.clearInterval(progressTimer)
       setDeletionProgress(0)
@@ -129,6 +138,12 @@ export default function StatusLookup({ initialCode }: { initialCode?: string | n
           <button className="status-lookup-submit" type="submit" disabled={loading}>{loading ? 'Consultando…' : 'Consultar'}</button>
         </div>
       </form>
+      {rememberedCode && (
+        <div className="saved-code-note">
+          <small>Este código se recordó en este navegador. Borrarlo de aquí no elimina la solicitud.</small>
+          <button type="button" onClick={() => { setCode(''); onForgetRememberedCode?.() }}>Borrar el código de este dispositivo</button>
+        </div>
+      )}
       {error && <p className="status-lookup-error" role="alert">{error}</p>}
       {result && (
         <div className="status-lookup-result" role="status">

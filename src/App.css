@@ -482,6 +482,11 @@ select:focus-visible {
   height: 16px;
   margin-top: 3px;
 }
+.remember-code-choice { display:flex; align-items:flex-start; gap:10px; color:var(--brand-graphite); font-size:12px; line-height:1.5; cursor:pointer; }
+.remember-code-choice input { flex:0 0 auto; width:16px; height:16px; margin:2px 0 0; accent-color:var(--brand-blue-deep); }
+.remember-code-choice>span { display:grid; gap:3px; }
+.remember-code-choice b { font-weight:700; }
+.remember-code-choice small { color:#5e6978; font-size:11px; line-height:1.45; }
 
 .submit-button {
   display: flex;
@@ -728,6 +733,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .status-lookup>form>label { color:var(--brand-graphite); font-size:12px; font-weight:700; }
 .status-lookup-controls { display:flex; gap:8px; }
 .status-lookup-controls input { flex:1; min-width:0; border:1px solid var(--brand-silver); border-radius:8px; padding:11px 12px; color:var(--brand-graphite); font:inherit; text-transform:uppercase; }
+.saved-code-note { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border:1px solid #c9dff3; border-radius:9px; background:#f3f8fe; }
+.saved-code-note small { color:#46586c; font-size:11px; line-height:1.45; }
+.saved-code-note button { flex:none; border:0; padding:4px; background:transparent; color:#005da8; font:inherit; font-size:11px; font-weight:700; text-decoration:underline; cursor:pointer; }
+.saved-code-note button:focus-visible { outline:2px solid var(--brand-electric); outline-offset:2px; }
+.remembered-code-banner { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0; padding:10px 13px; border:1px solid #c9dff3; border-radius:9px; background:#f3f8fe; color:#34495f; font-size:12px; }
+.remembered-code-banner a { color:#005da8; font-weight:700; white-space:nowrap; }
 .status-lookup-submit { border:0; border-radius:8px; padding:10px 16px; background:#006fc6; color:#fff; font-weight:700; cursor:pointer; }
 .status-lookup-submit:disabled { opacity:.6; cursor:wait; }
 .status-lookup-error { margin:0; border-radius:8px; padding:10px 12px; background:#fff0f0; color:#a43c3c; font-size:12px; }
@@ -766,4 +777,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .status-lookup { padding:15px; }
   .status-lookup-controls { align-items:stretch; flex-direction:column; }
   .status-lookup-submit { min-height:42px; }
+  .saved-code-note { align-items:flex-start; flex-direction:column; }
+  .remembered-code-banner { align-items:flex-start; flex-direction:column; }
 }

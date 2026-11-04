@@ -113,6 +113,18 @@ const deliveryPhotos = [
   'entrega-chatgpt-6.jpg',
 ]
 
+const trackingCodeStorageKey = 'prestamos-variety:tracking-code:v1'
+
+function readRememberedTrackingCode(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const code = window.localStorage.getItem(trackingCodeStorageKey)?.toUpperCase() ?? ''
+    return /^[A-HJ-NP-Z2-9]{3}(?:-[A-HJ-NP-Z2-9]{3}){2}$/.test(code) ? code : null
+  } catch {
+    return null
+  }
+}
+
 const formatMoney = (value: number) =>
   new Intl.NumberFormat('es-AR', {
     style: 'currency',
@@ -249,6 +261,7 @@ function App() {
   const deliveryModalCloseRef = useRef<HTMLButtonElement>(null)
   const galleryInteractionPauseUntilRef = useRef(0)
   const [selectedDeliveryPhoto, setSelectedDeliveryPhoto] = useState<string | null>(null)
+  const [rememberedTrackingCode, setRememberedTrackingCode] = useState<string | null>(() => readRememberedTrackingCode())
   const [housing, setHousing] = useState('')
   const [referrerStatus, setReferrerStatus] = useState('')
   const [electroVarietyClientStatus, setElectroVarietyClientStatus] = useState('')
@@ -260,13 +273,14 @@ function App() {
   const [loanFrequency, setLoanFrequency] =
     useState<LoanFrequency>('weekly')
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
+  const [rememberTrackingCode, setRememberTrackingCode] = useState(() => Boolean(rememberedTrackingCode))
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File[]>>({})
   const [uploadResetKey, setUploadResetKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showRequiredErrors, setShowRequiredErrors] = useState(false)
   const [submitMessage, setSubmitMessage] = useState('')
   const [submitError, setSubmitError] = useState('')
-  const [trackingCode, setTrackingCode] = useState<string | null>(null)
+  const [trackingCode, setTrackingCode] = useState<string | null>(rememberedTrackingCode)
   const [trackingCodeCopied, setTrackingCodeCopied] = useState(false)
 
   const selectedPlan = loanPlans[loanAmount][loanFrequency]
@@ -481,9 +495,26 @@ function App() {
       if (typeof data.tracking_code !== 'string') {
         throw new Error('La solicitud se guardó, pero no se recibió su código. Contactanos para obtener ayuda.')
       }
+      let codeWasRemembered = false
+      try {
+        if (rememberTrackingCode) {
+          window.localStorage.setItem(trackingCodeStorageKey, data.tracking_code)
+          setRememberedTrackingCode(data.tracking_code)
+          codeWasRemembered = true
+        } else {
+          window.localStorage.removeItem(trackingCodeStorageKey)
+          setRememberedTrackingCode(null)
+        }
+      } catch {
+        setRememberedTrackingCode(null)
+      }
       setTrackingCode(data.tracking_code)
       setTrackingCodeCopied(false)
-      setSubmitMessage('La solicitud se envió correctamente. Guardá este código para consultar su estado.')
+      setSubmitMessage(codeWasRemembered
+        ? 'La solicitud se envió correctamente. El código quedó guardado en este dispositivo.'
+        : rememberTrackingCode
+          ? 'La solicitud se envió correctamente. No se pudo guardar el código en este navegador; copialo y guardalo.'
+          : 'La solicitud se envió correctamente. Guardá este código para consultar su estado.')
       setShowRequiredErrors(false)
       form.reset()
       setSelectedFiles({})
@@ -523,6 +554,13 @@ function App() {
         <span className="secure-label">Solicitud online</span>
         <a className="status-nav-link" href="#consultar-estado">Consultar estado</a>
       </header>
+
+      {rememberedTrackingCode && !submitMessage && (
+        <div className="remembered-code-banner" role="status">
+          <span>Hay un código de seguimiento guardado en este dispositivo.</span>
+          <a href="#consultar-estado">Consultar estado ↓</a>
+        </div>
+      )}
 
       <div className="hero">
         <span className="eyebrow">SOLICITUD PERSONAL</span>
@@ -1153,6 +1191,17 @@ function App() {
               política de privacidad. *
             </span>
           </label>
+          <label className="remember-code-choice">
+            <input
+              type="checkbox"
+              checked={rememberTrackingCode}
+              onChange={(event) => setRememberTrackingCode(event.target.checked)}
+            />
+            <span>
+              <b>Recordar el código de seguimiento en este dispositivo</b>
+              <small>Es opcional y solo se guarda en este navegador. Desactivá esta opción si compartís el dispositivo.</small>
+            </span>
+          </label>
 
         </section>
 
@@ -1180,7 +1229,16 @@ function App() {
         </p>
       </form>
 
-      <StatusLookup initialCode={trackingCode} />
+      <StatusLookup
+        initialCode={trackingCode}
+        rememberedCode={rememberedTrackingCode}
+        onForgetRememberedCode={() => {
+          try { window.localStorage.removeItem(trackingCodeStorageKey) } catch { /* El borrado local no afecta la consulta manual. */ }
+          setRememberedTrackingCode(null)
+          setRememberTrackingCode(false)
+          if (!submitMessage) setTrackingCode(null)
+        }}
+      />
 
       <footer className="site-footer">
         <span className="logo-frame footer-logo-frame">
