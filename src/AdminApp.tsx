@@ -27,7 +27,7 @@ type Application = ExportApplication & {
   documents: Document[]
 }
 
-type ApplicationSummary = Pick<Application, 'id' | 'status' | 'full_name' | 'dni' | 'phone' | 'created_at' | 'loan_amount' | 'archived_at' | 'is_electro_variety_client'> & { has_salary_receipt: boolean }
+type ApplicationSummary = Pick<Application, 'id' | 'status' | 'full_name' | 'dni' | 'phone' | 'created_at' | 'loan_amount' | 'archived_at' | 'is_electro_variety_client' | 'has_referrer'> & { has_salary_receipt: boolean }
 
 const money = (amount: unknown) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Number(amount) || 0)
@@ -121,6 +121,7 @@ export default function AdminApp() {
   const [clientSearch, setClientSearch] = useState('')
   const [onlyElectroClients, setOnlyElectroClients] = useState(false)
   const [onlySalaryReceipt, setOnlySalaryReceipt] = useState(false)
+  const [onlyRecommended, setOnlyRecommended] = useState(false)
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -499,6 +500,7 @@ export default function AdminApp() {
     return matchesClient
       && (!onlyElectroClients || application.is_electro_variety_client === true)
       && (!onlySalaryReceipt || application.has_salary_receipt)
+      && (!onlyRecommended || application.has_referrer)
   })
 
   const toggleApplication = (id: string) => {
@@ -746,6 +748,7 @@ export default function AdminApp() {
             <div className="application-criteria-filters" aria-label="Filtros de prioridad">
               <label><input type="checkbox" checked={onlyElectroClients} onChange={(event) => { setOnlyElectroClients(event.target.checked); setSelectedIds(new Set()) }} /> Cliente de Electro Variety</label>
               <label><input type="checkbox" checked={onlySalaryReceipt} onChange={(event) => { setOnlySalaryReceipt(event.target.checked); setSelectedIds(new Set()) }} /> Tiene recibo de sueldo</label>
+              <label><input type="checkbox" checked={onlyRecommended} onChange={(event) => { setOnlyRecommended(event.target.checked); setSelectedIds(new Set()) }} /> Vino recomendado</label>
             </div>
             <div className="bulk-export-actions">
               <button onClick={selectVisibleApplications} disabled={!visibleApplications.length || loading || exporting}>Seleccionar todas del filtro</button>
