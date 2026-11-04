@@ -114,7 +114,10 @@ export default function AdminApp() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const selectedRequestId = useRef(0)
+  const applicationsLoadId = useRef(0)
   const [filter, setFilter] = useState('pending')
+  const filterRef = useRef(filter)
+  filterRef.current = filter
   const [clientSearch, setClientSearch] = useState('')
   const [onlyElectroClients, setOnlyElectroClients] = useState(false)
   const [onlySalaryReceipt, setOnlySalaryReceipt] = useState(false)
@@ -209,6 +212,8 @@ export default function AdminApp() {
   }
 
   const loadApplications = useCallback(async () => {
+    const requestId = ++applicationsLoadId.current
+    const requestFilter = filterRef.current
     if (!session) return
     setLoading(true)
     setError('')
@@ -218,7 +223,7 @@ export default function AdminApp() {
       let offset = 0
       let hasNextPage = true
       while (hasNextPage) {
-        const data = await callAdmin({ action: 'list_summary', status: filter, offset: String(offset) })
+        const data = await callAdmin({ action: 'list_summary', status: requestFilter, offset: String(offset) })
         const pageRows = (data.applications ?? []) as ApplicationSummary[]
         rows.push(...pageRows)
         hasNextPage = Boolean(data.has_more)
@@ -226,17 +231,19 @@ export default function AdminApp() {
         if (hasNextPage && nextOffset <= offset) throw new Error('La carga de solicitudes no pudo avanzar. Actualizá el panel e intentá de nuevo.')
         offset = nextOffset
       }
-      setApplications(rows)
+      if (requestId === applicationsLoadId.current && requestFilter === filterRef.current) setApplications(rows)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudieron cargar las solicitudes.')
+      if (requestId === applicationsLoadId.current && requestFilter === filterRef.current) {
+        setError(cause instanceof Error ? cause.message : 'No se pudieron cargar las solicitudes.')
+      }
     } finally {
-      setLoading(false)
+      if (requestId === applicationsLoadId.current && requestFilter === filterRef.current) setLoading(false)
     }
-  }, [session, filter, callAdmin])
+  }, [session, callAdmin])
 
   useEffect(() => {
     void loadApplications()
-  }, [loadApplications])
+  }, [loadApplications, filter])
 
   const signIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -690,7 +697,7 @@ export default function AdminApp() {
       </header>
       <section className="admin-heading">
         <div><p className="admin-kicker">GESTIÓN DE CRÉDITOS</p><h1>Solicitudes de préstamos</h1><p>Revisá los datos y documentos antes de tomar una decisión.</p></div>
-        <select aria-label="Filtrar solicitudes" value={filter} onChange={(event) => { selectedRequestId.current += 1; setSelected(null); setSelectedId(null); setDetailLoading(false); setSelectedIds(new Set()); setFilter(event.target.value) }}>
+        <select aria-label="Filtrar solicitudes" value={filter} onChange={(event) => { selectedRequestId.current += 1; setSelected(null); setSelectedId(null); setDetailLoading(false); setSelectedIds(new Set()); setApplications([]); setFilter(event.target.value) }}>
           <option value="pending">Pendientes</option><option value="under_review">En revisión</option><option value="approved">Aprobadas</option><option value="rejected">Rechazadas</option><option value="all">Todas</option><option value="archived">Archivadas</option>
         </select>
       </section>
