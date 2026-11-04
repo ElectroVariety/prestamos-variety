@@ -439,7 +439,7 @@ Deno.serve(async (request: Request) => {
   const offset = rawOffset;
 
   let query = admin.from("loan_applications")
-    .select(summaryList ? "id,status,full_name,dni,created_at,loan_amount,archived_at,is_electro_variety_client" : "*")
+    .select(summaryList ? "id,status,full_name,dni,phone,created_at,loan_amount,archived_at,is_electro_variety_client" : "*")
     .order("created_at", { ascending: true })
     .order("id", { ascending: true })
     .range(offset, offset + PAGE_SIZE);

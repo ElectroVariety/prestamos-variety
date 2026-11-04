@@ -27,7 +27,7 @@ type Application = ExportApplication & {
   documents: Document[]
 }
 
-type ApplicationSummary = Pick<Application, 'id' | 'status' | 'full_name' | 'dni' | 'created_at' | 'loan_amount' | 'archived_at' | 'is_electro_variety_client'> & { has_salary_receipt: boolean }
+type ApplicationSummary = Pick<Application, 'id' | 'status' | 'full_name' | 'dni' | 'phone' | 'created_at' | 'loan_amount' | 'archived_at' | 'is_electro_variety_client'> & { has_salary_receipt: boolean }
 
 const money = (amount: unknown) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Number(amount) || 0)
@@ -482,11 +482,13 @@ export default function AdminApp() {
 
   const visibleApplications = applications.filter((application) => {
     const query = clientSearch.trim().toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const phoneQuery = clientSearch.replace(/\D/g, '')
     const matchesClient = !query || `${application.full_name} ${application.dni}`
       .toLocaleLowerCase('es-AR')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .includes(query)
+      || (phoneQuery.length > 0 && application.phone.replace(/\D/g, '').includes(phoneQuery))
     return matchesClient
       && (!onlyElectroClients || application.is_electro_variety_client === true)
       && (!onlySalaryReceipt || application.has_salary_receipt)
@@ -730,8 +732,8 @@ export default function AdminApp() {
                 type="search"
                 value={clientSearch}
                 onChange={(event) => { setClientSearch(event.target.value); setSelectedIds(new Set()) }}
-                placeholder="Nombre o DNI"
-                aria-label="Buscar solicitudes por nombre o DNI"
+                placeholder="Nombre, DNI o teléfono"
+                aria-label="Buscar solicitudes por nombre, DNI o teléfono"
               />
             </label>
             <div className="application-criteria-filters" aria-label="Filtros de prioridad">
