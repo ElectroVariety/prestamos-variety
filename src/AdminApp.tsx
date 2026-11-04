@@ -115,6 +115,7 @@ export default function AdminApp() {
   const [detailLoading, setDetailLoading] = useState(false)
   const selectedRequestId = useRef(0)
   const [filter, setFilter] = useState('pending')
+  const [clientSearch, setClientSearch] = useState('')
   const [onlyElectroClients, setOnlyElectroClients] = useState(false)
   const [onlySalaryReceipt, setOnlySalaryReceipt] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -480,7 +481,14 @@ export default function AdminApp() {
   }
 
   const visibleApplications = applications.filter((application) => {
-    return (!onlyElectroClients || application.is_electro_variety_client === true)
+    const query = clientSearch.trim().toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const matchesClient = !query || `${application.full_name} ${application.dni}`
+      .toLocaleLowerCase('es-AR')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .includes(query)
+    return matchesClient
+      && (!onlyElectroClients || application.is_electro_variety_client === true)
       && (!onlySalaryReceipt || application.has_salary_receipt)
   })
 
@@ -716,6 +724,16 @@ export default function AdminApp() {
           <div className="admin-list-header"><b>{visibleApplications.length} solicitudes cargadas</b><button onClick={() => void loadApplications()} disabled={loading}>Actualizar</button></div>
           <div className="bulk-export-toolbar">
             <b>{selectedIds.size} seleccionadas</b>
+            <label className="application-search">
+              <span>Buscar cliente</span>
+              <input
+                type="search"
+                value={clientSearch}
+                onChange={(event) => { setClientSearch(event.target.value); setSelectedIds(new Set()) }}
+                placeholder="Nombre o DNI"
+                aria-label="Buscar solicitudes por nombre o DNI"
+              />
+            </label>
             <div className="application-criteria-filters" aria-label="Filtros de prioridad">
               <label><input type="checkbox" checked={onlyElectroClients} onChange={(event) => { setOnlyElectroClients(event.target.checked); setSelectedIds(new Set()) }} /> Cliente de Electro Variety</label>
               <label><input type="checkbox" checked={onlySalaryReceipt} onChange={(event) => { setOnlySalaryReceipt(event.target.checked); setSelectedIds(new Set()) }} /> Tiene recibo de sueldo</label>

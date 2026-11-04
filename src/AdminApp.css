@@ -58,6 +58,9 @@
 .application-list-item .application-row { flex:1; border-bottom:0; padding-left:0; }
 .bulk-export-toolbar { display:grid; gap:9px; padding:13px; border-bottom:1px solid #edf0ed; background:#f7faff; }
 .bulk-export-toolbar>b { color:var(--brand-graphite); font-size:12px; }
+.application-search { display:grid; gap:6px; color:var(--brand-graphite); font-size:11px; font-weight:700; }
+.application-search input { box-sizing:border-box; width:100%; min-width:0; border:1px solid var(--brand-silver); border-radius:8px; padding:9px 10px; background:#fff; color:var(--brand-graphite); font:inherit; font-weight:400; }
+.application-search input:focus-visible { outline:3px solid #008fff35; border-color:var(--brand-electric); }
 .application-criteria-filters { display:grid; gap:7px; padding:9px 10px; border:1px solid #d8e4f1; border-radius:8px; background:#fff; }
 .application-criteria-filters label { display:flex; align-items:center; gap:8px; color:var(--brand-graphite); font-size:11px; cursor:pointer; }
 .application-criteria-filters input { width:15px; height:15px; margin:0; accent-color:var(--brand-blue-deep); }
