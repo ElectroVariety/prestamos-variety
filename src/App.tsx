@@ -1193,6 +1193,9 @@ function App() {
         </Section>
 
         <section className="privacy-section">
+          <p className="credit-check-notice">
+            Durante la evaluación, un administrador puede consultar Nosis con tu DNI para obtener tu CUIL y revisar la información publicada en la Central de Deudores del BCRA. La consulta se realiza manualmente desde el panel; el resultado se muestra solo a administradores y no determina automáticamente la aprobación o el rechazo.
+          </p>
           <label className="privacy-choice">
             <input
               type="checkbox"

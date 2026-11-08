@@ -29,6 +29,22 @@ type Application = ExportApplication & {
 
 type ApplicationSummary = Pick<Application, 'id' | 'status' | 'full_name' | 'dni' | 'phone' | 'locality' | 'created_at' | 'loan_amount' | 'archived_at' | 'is_electro_variety_client' | 'has_referrer'> & { has_salary_receipt: boolean }
 
+type BcraCreditCheck = {
+  cuil: string
+  name: string
+  has_records: boolean
+  period: string | null
+  queried_at: string
+  entities: Array<{
+    entidad: string
+    situacion: number | null
+    monto_miles: number | null
+    dias_atraso: number | null
+    en_revision: boolean
+    proceso_judicial: boolean
+  }>
+}
+
 const money = (amount: unknown) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Number(amount) || 0)
 
@@ -91,6 +107,14 @@ const statusLabel: Record<string, string> = {
   rejected: 'Rechazada',
 }
 
+const bcraSituationLabel: Record<number, string> = {
+  1: 'Normal',
+  2: 'Seguimiento especial / riesgo bajo',
+  3: 'Con problemas / riesgo medio',
+  4: 'Alto riesgo de insolvencia',
+  5: 'Irrecuperable',
+}
+
 function PdfField({ label, value }: { label: string; value: unknown }) {
   const text = value === null || value === undefined || value === '' ? '—' : String(value)
   return <div className="pdf-field"><small>{label}</small><b>{text}</b></div>
@@ -113,6 +137,9 @@ export default function AdminApp() {
   const [selected, setSelected] = useState<Application | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [bcraLoading, setBcraLoading] = useState(false)
+  const [bcraError, setBcraError] = useState('')
+  const [bcraCheck, setBcraCheck] = useState<{ applicationId: string; result: BcraCreditCheck } | null>(null)
   const selectedRequestId = useRef(0)
   const applicationsLoadId = useRef(0)
   const [filter, setFilter] = useState('pending')
@@ -149,6 +176,8 @@ export default function AdminApp() {
     setDetailLoading(true)
     setDecisionNote('')
     setError('')
+    setBcraError('')
+    setBcraCheck(null)
     try {
       const data = await callAdmin({ action: 'detail', application_id: application.id })
       if (requestId === selectedRequestId.current) setSelected(data.application as Application)
@@ -192,6 +221,21 @@ export default function AdminApp() {
     if (!data?.success) throw new Error(data?.error || 'No se pudo completar la operación.')
     return data
   }, [])
+
+  const checkBcra = async () => {
+    if (!selected || bcraLoading) return
+    setBcraLoading(true)
+    setBcraError('')
+    setBcraCheck(null)
+    try {
+      const data = await callAdmin({ action: 'check_bcra', application_id: selected.id })
+      setBcraCheck({ applicationId: selected.id, result: data.credit_check as BcraCreditCheck })
+    } catch (cause) {
+      setBcraError(cause instanceof Error ? cause.message : 'No se pudo consultar la Central de Deudores.')
+    } finally {
+      setBcraLoading(false)
+    }
+  }
 
   const openDocument = async (applicationId: string, document: Document) => {
     const documentWindow = window.open('about:blank', '_blank')
@@ -819,6 +863,42 @@ export default function AdminApp() {
                   <div><small>Total estimado a pagar</small><b>{money(selected.total_to_pay)}</b></div>
                   <div className="detail-wide"><small>¿Para qué necesita el préstamo?</small><b>{selected.loan_purpose}</b></div>
                 </div>
+              </div>
+              <div className="detail-subsection">
+                <h3>Central de Deudores del BCRA</h3>
+                <p>La consulta se inicia solo cuando la solicitás. Se usa Nosis para obtener el CUIL a partir del DNI y luego se consulta el BCRA; el resultado no se guarda en la solicitud.</p>
+                <button className="bcra-check-button" onClick={() => void checkBcra()} disabled={bcraLoading}>
+                  {bcraLoading ? 'Consultando Nosis y BCRA…' : 'Consultar situación crediticia'}
+                </button>
+                {bcraError && <p className="admin-error bcra-error" role="alert">{bcraError}</p>}
+                {bcraCheck?.applicationId === selected.id && (
+                  <div className="bcra-result" aria-live="polite">
+                    <div className="bcra-result-heading">
+                      <b>{bcraCheck.result.name || selected.full_name}</b>
+                      <span>CUIL {bcraCheck.result.cuil}</span>
+                    </div>
+                    <small>Consultado {formatDateTime(bcraCheck.result.queried_at)} · Período informado: {bcraCheck.result.period ? `${bcraCheck.result.period.slice(4, 6)}/${bcraCheck.result.period.slice(0, 4)}` : 'sin datos'}</small>
+                    {!bcraCheck.result.has_records ? (
+                      <p>El BCRA no encontró información para este CUIL.</p>
+                    ) : bcraCheck.result.entities.length === 0 ? (
+                      <p>Hay períodos informados, pero no se encontraron entidades en el último período.</p>
+                    ) : (
+                      <div className="bcra-entity-list">
+                        {bcraCheck.result.entities.map((entity, index) => (
+                          <div className="bcra-entity" key={`${entity.entidad}-${index}`}>
+                            <b>{entity.entidad}</b>
+                            <span>Situación {entity.situacion ?? 'sin especificar'}{entity.situacion !== null && bcraSituationLabel[entity.situacion] ? ` · ${bcraSituationLabel[entity.situacion]}` : ''}</span>
+                            {entity.monto_miles !== null && <span>Monto informado: {money(entity.monto_miles * 1000)}</span>}
+                            {entity.dias_atraso !== null && entity.dias_atraso > 0 && <span>Días de atraso: {entity.dias_atraso}</span>}
+                            {entity.en_revision && <span>Información en revisión</span>}
+                            {entity.proceso_judicial && <span>Información sometida a proceso judicial</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <small>El monto publicado por el BCRA está expresado en miles de pesos. La Central se actualiza periódicamente y aparecer en ella no significa necesariamente estar en mora: la situación 1 es normal. El resultado no determina por sí solo la aprobación del préstamo.</small>
+                  </div>
+                )}
               </div>
               <div className="detail-subsection">
                 <h3>Datos personales</h3>

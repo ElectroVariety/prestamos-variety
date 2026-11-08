@@ -140,3 +140,16 @@
   .pdf-consents small, .pdf-documents small { color:#5e6978; font-size:8pt; overflow-wrap:anywhere; }
   .pdf-footer { padding-top:7px; border-top:1px solid #b8c3d1; color:#5e6978; text-align:center; font-size:8pt; }
 }
+
+.bcra-check-button { min-height:40px; border:0; border-radius:9px; padding:9px 14px; background:#006fc6; color:#fff; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.bcra-check-button:hover { background:#008fff; }
+.bcra-check-button:disabled { opacity:.6; cursor:wait; }
+.bcra-result { display:grid; gap:10px; margin-top:14px; padding:14px; border:1px solid #b8c3d1; border-radius:10px; background:#f4f7fa; color:#252b35; }
+.bcra-result-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+.bcra-result-heading span,.bcra-result>small { color:#5e6978; font-size:11px; }
+.bcra-result>p { margin:0; font-size:13px; }
+.bcra-entity-list { display:grid; gap:8px; }
+.bcra-entity { display:grid; gap:4px; padding:10px; border:1px solid #dfe5ed; border-radius:8px; background:#fff; font-size:12px; }
+.bcra-entity span { color:#5e6978; }
+.bcra-error { margin:12px 0 0!important; }
+.detail-subsection > .bcra-error { color:#9c3030; font-size:13px; }

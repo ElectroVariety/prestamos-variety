@@ -70,6 +70,148 @@ function respond(body: Record<string, unknown>, status: number, origin: string) 
   return new Response(JSON.stringify(body), { status, headers });
 }
 
+type BcraEntity = {
+  entidad: string;
+  situacion: number | null;
+  monto_miles: number | null;
+  dias_atraso: number | null;
+  en_revision: boolean;
+  proceso_judicial: boolean;
+};
+
+function normalizeDigits(value: unknown): string {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+async function lookupBcraByApplicationDni(admin: SupabaseClient, applicationId: string) {
+  const { data: application, error: applicationError } = await admin
+    .from("loan_applications")
+    .select("id,dni,full_name")
+    .eq("id", applicationId)
+    .maybeSingle();
+  if (applicationError) throw new Error("No se pudo leer el DNI de la solicitud.");
+  if (!application) throw new Error("La solicitud ya no está disponible.");
+
+  const dni = String(application.dni ?? "").trim();
+  if (!dni || dni.length > 20) throw new Error("La solicitud no tiene un DNI válido para consultar.");
+  const dniDigits = normalizeDigits(dni);
+  if (!/^\d{7,8}$/.test(dniDigits)) throw new Error("El DNI de esta solicitud no permite validar el CUIL automáticamente.");
+
+  let nosisResponse: Response;
+  try {
+    const form = new URLSearchParams({
+      Texto: dni,
+      Tipo: "-1",
+      EdadDesde: "-1",
+      EdadHasta: "-1",
+      IdProvincia: "-1",
+      Localidad: "",
+    });
+    nosisResponse = await fetch("https://informes.nosis.com/Home/Buscar", {
+      method: "POST",
+      headers: {
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://informes.nosis.com/",
+      },
+      body: form,
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new Error("No se pudo conectar con Nosis. Intentá nuevamente más tarde.");
+  }
+  if (!nosisResponse.ok) throw new Error("Nosis no pudo procesar la búsqueda en este momento.");
+
+  let nosis: Record<string, unknown>;
+  try {
+    nosis = await nosisResponse.json() as Record<string, unknown>;
+  } catch {
+    throw new Error("Nosis devolvió una respuesta que no se pudo interpretar.");
+  }
+  if (nosis.ExigirCaptcha === true) {
+    throw new Error("Nosis solicitó una verificación adicional. No se pudo completar la consulta automática.");
+  }
+  if (nosis.HayError === true) throw new Error("Nosis no pudo completar la búsqueda.");
+
+  const candidates = Array.isArray(nosis.EntidadesEncontradas) ? nosis.EntidadesEncontradas : [];
+  const paddedDni = dniDigits.length === 7 ? dniDigits.padStart(8, "0") : dniDigits;
+  const matching = candidates.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const candidate = item as Record<string, unknown>;
+    const cuil = normalizeDigits(candidate.Documento);
+    if (!/^\d{11}$/.test(cuil) || (paddedDni.length === 8 && cuil.slice(2, 10) !== paddedDni)) return [];
+    return [{ cuil, name: typeof candidate.RazonSocial === "string" ? candidate.RazonSocial : "" }];
+  });
+  const uniqueCandidates = [...new Map(matching.map((candidate) => [candidate.cuil, candidate])).values()];
+  if (!uniqueCandidates.length) {
+    throw new Error("Nosis no encontró un CUIL asociado al DNI de esta solicitud.");
+  }
+  if (uniqueCandidates.length > 1) {
+    throw new Error("Nosis devolvió más de un CUIL posible para este DNI. Revisá la identidad antes de consultar el BCRA.");
+  }
+
+  const { cuil, name: nosisName } = uniqueCandidates[0];
+  let bcraResponse: Response;
+  try {
+    bcraResponse = await fetch(`https://api.bcra.gob.ar/CentralDeDeudores/v1.0/Deudas/${cuil}`, {
+      headers: { "Accept": "application/json" },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new Error("Se obtuvo el CUIL, pero no se pudo conectar con el BCRA.");
+  }
+
+  if (bcraResponse.status === 404) {
+    return {
+      cuil,
+      name: nosisName || String(application.full_name ?? ""),
+      has_records: false,
+      period: null,
+      entities: [] as BcraEntity[],
+      queried_at: new Date().toISOString(),
+    };
+  }
+  if (!bcraResponse.ok) throw new Error("El BCRA no pudo completar la consulta en este momento.");
+
+  let bcra: Record<string, unknown>;
+  try {
+    bcra = await bcraResponse.json() as Record<string, unknown>;
+  } catch {
+    throw new Error("El BCRA devolvió una respuesta que no se pudo interpretar.");
+  }
+  const results = bcra.results && typeof bcra.results === "object"
+    ? bcra.results as Record<string, unknown>
+    : {};
+  const periods = Array.isArray(results.periodos) ? results.periodos : [];
+  const latest = [...periods]
+    .filter((period): period is Record<string, unknown> => Boolean(period) && typeof period === "object")
+    .sort((a, b) => String(b.periodo ?? "").localeCompare(String(a.periodo ?? "")))[0];
+  const entities = Array.isArray(latest?.entidades) ? latest.entidades.flatMap((entity) => {
+    if (!entity || typeof entity !== "object") return [];
+    const item = entity as Record<string, unknown>;
+    return [{
+      entidad: typeof item.entidad === "string" ? item.entidad : "Entidad informante",
+      situacion: typeof item.situacion === "number" ? item.situacion : null,
+      monto_miles: typeof item.monto === "number" && Number.isFinite(item.monto) ? item.monto : null,
+      dias_atraso: typeof item.diasAtrasoPago === "number" ? item.diasAtrasoPago : null,
+      en_revision: item.enRevision === true,
+      proceso_judicial: item.procesoJud === true,
+    } satisfies BcraEntity];
+  }) : [];
+
+  return {
+    cuil,
+    name: typeof results.denominacion === "string" && results.denominacion
+      ? results.denominacion
+      : nosisName || String(application.full_name ?? ""),
+    has_records: periods.length > 0,
+    period: typeof latest?.periodo === "string" ? latest.periodo : null,
+    entities,
+    queried_at: new Date().toISOString(),
+  };
+}
+
 type RejectionNotificationState = "not_eligible" | "pending" | "sending" | "sent" | "failed" | "unknown";
 
 function normalizeWhatsAppRecipient(phone: string): string | null {
@@ -246,6 +388,17 @@ Deno.serve(async (request: Request) => {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid");
     body = parsed as Record<string, unknown>;
   } catch { return respond({ error: "La solicitud no tiene un formato válido." }, 400, origin); }
+
+  if (body.action === "check_bcra") {
+    const applicationId = typeof body.application_id === "string" ? body.application_id : "";
+    if (!/^[0-9a-f-]{36}$/i.test(applicationId)) return respond({ error: "La solicitud indicada no es válida." }, 400, origin);
+    try {
+      const creditCheck = await lookupBcraByApplicationDni(admin, applicationId);
+      return respond({ success: true, credit_check: creditCheck }, 200, origin);
+    } catch (error) {
+      return respond({ error: error instanceof Error ? error.message : "No se pudo consultar el BCRA." }, 502, origin);
+    }
+  }
 
   if (body.action === "detail") {
     const id = typeof body.application_id === "string" ? body.application_id : "";
