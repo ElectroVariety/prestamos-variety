@@ -398,9 +398,15 @@ function App() {
 
     const formData = new FormData(form)
     const value = (name: string) => String(formData.get(name) ?? '').trim()
+    const parseAmount = (raw: string) => {
+      if (!/^\d+$/.test(raw) && !/^\d{1,3}(?:\.\d{3})+$/.test(raw) && !/^\d{1,3}(?:,\d{3})+$/.test(raw)) return null
+      const normalized = raw.replace(/[.,]/g, '')
+      const amount = Number(normalized)
+      return Number.isSafeInteger(amount) ? amount : null
+    }
     const numeric = (name: string) => {
       const raw = value(name)
-      return raw === '' ? null : Number(raw)
+      return raw === '' ? null : parseAmount(raw)
     }
     const sourceTypeMap: Record<IncomeType, string> = {
       formal: 'formal_employment',
@@ -632,10 +638,12 @@ function App() {
             <Field label="DNI">
               <input
                 name="dni"
-                inputMode="numeric"
+                inputMode="text"
+                autoCapitalize="characters"
                 autoComplete="off"
-                pattern="[0-9]{7,8}"
-                title="Ingresá un DNI de 7 u 8 números"
+                maxLength={16}
+                pattern="[A-Za-z]?[0-9. -]{7,15}"
+                title="Ingresá 7 u 8 números, con puntos opcionales; si tu DNI empieza con una letra, también podés incluirla."
                 required
               />
             </Field>
@@ -856,8 +864,11 @@ function App() {
                     <Field label="DNI del titular">
                       <input
                         name="service_holder_dni"
-                        inputMode="numeric"
-                        pattern="[0-9]{7,8}"
+                        inputMode="text"
+                        autoCapitalize="characters"
+                        maxLength={16}
+                        pattern="[A-Za-z]?[0-9. -]{7,15}"
+                        title="Ingresá 7 u 8 números, con puntos opcionales; si el DNI empieza con una letra, también podés incluirla."
                         required
                       />
                     </Field>
@@ -916,9 +927,10 @@ function App() {
                 <Field label="Monto aproximado de la deuda">
                   <input
                     name="debt_amount"
-                    type="number"
-                    min="0"
-                    step="1000"
+                    type="text"
+                    inputMode="decimal"
+                    pattern="[0-9.,]+"
+                    title="Ingresá el monto entero en pesos; podés usar puntos como separadores de miles."
                     required
                   />
                 </Field>
@@ -954,9 +966,10 @@ function App() {
                   <Field label="Ingreso mensual aproximado">
                     <input
                       name={`income_${type}`}
-                      type="number"
-                      min="0"
-                      step="1000"
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9.,]+"
+                      title="Ingresá el monto entero en pesos; podés usar puntos como separadores de miles."
                       required
                     />
                   </Field>
@@ -1017,8 +1030,10 @@ function App() {
                       <Field label="Facturación mensual aproximada">
                         <input
                           name="business_revenue"
-                          type="number"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
+                          pattern="[0-9.,]+"
+                          title="Ingresá el monto entero en pesos; podés usar puntos como separadores de miles."
                           required
                         />
                       </Field>
@@ -1026,8 +1041,10 @@ function App() {
                       <Field label="Ganancia mensual aproximada">
                         <input
                           name="business_profit"
-                          type="number"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
+                          pattern="[0-9.,]+"
+                          title="Ingresá el monto entero en pesos; podés usar puntos como separadores de miles."
                           required
                         />
                       </Field>

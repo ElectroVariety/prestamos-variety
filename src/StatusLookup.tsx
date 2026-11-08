@@ -163,7 +163,7 @@ export default function StatusLookup({
           <h3>Confirmar eliminación</h3>
           <p>Se eliminarán permanentemente los datos personales, financieros y documentos de esta solicitud. Para confirmar, ingresá el DNI asociado.</p>
           <label htmlFor="deletion-dni">DNI de la solicitud</label>
-          <input id="deletion-dni" type="text" inputMode="numeric" autoComplete="off" value={dniConfirmation} onChange={(event) => setDniConfirmation(event.target.value)} required disabled={deleting} />
+          <input id="deletion-dni" type="text" inputMode="text" autoCapitalize="characters" autoComplete="off" value={dniConfirmation} onChange={(event) => setDniConfirmation(event.target.value)} required disabled={deleting} />
           {deleting && <>
             <div className="deletion-progress-label"><span>Eliminando datos y archivos…</span><strong>{deletionProgress}%</strong></div>
             <div className="deletion-progress" role="progressbar" aria-label="Eliminando datos de la solicitud" aria-valuemin={0} aria-valuemax={100} aria-valuenow={deletionProgress}>

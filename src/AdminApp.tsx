@@ -27,7 +27,7 @@ type Application = ExportApplication & {
   documents: Document[]
 }
 
-type ApplicationSummary = Pick<Application, 'id' | 'status' | 'full_name' | 'dni' | 'phone' | 'created_at' | 'loan_amount' | 'archived_at' | 'is_electro_variety_client' | 'has_referrer'> & { has_salary_receipt: boolean }
+type ApplicationSummary = Pick<Application, 'id' | 'status' | 'full_name' | 'dni' | 'phone' | 'locality' | 'created_at' | 'loan_amount' | 'archived_at' | 'is_electro_variety_client' | 'has_referrer'> & { has_salary_receipt: boolean }
 
 const money = (amount: unknown) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Number(amount) || 0)
@@ -491,7 +491,7 @@ export default function AdminApp() {
   const visibleApplications = applications.filter((application) => {
     const query = clientSearch.trim().toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     const phoneQuery = clientSearch.replace(/\D/g, '')
-    const matchesClient = !query || `${application.full_name} ${application.dni}`
+    const matchesClient = !query || `${application.full_name} ${application.dni} ${application.locality}`
       .toLocaleLowerCase('es-AR')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -741,8 +741,8 @@ export default function AdminApp() {
                 type="search"
                 value={clientSearch}
                 onChange={(event) => { setClientSearch(event.target.value); setSelectedIds(new Set()) }}
-                placeholder="Nombre, DNI o teléfono"
-                aria-label="Buscar solicitudes por nombre, DNI o teléfono"
+                placeholder="Nombre, DNI, teléfono o localidad"
+                aria-label="Buscar solicitudes por nombre, DNI, teléfono o localidad"
               />
             </label>
             <div className="application-criteria-filters" aria-label="Filtros de prioridad">

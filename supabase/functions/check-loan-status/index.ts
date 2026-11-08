@@ -23,6 +23,14 @@ async function hashTrackingCode(code: string) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function normalizeDni(value: string): string {
+  return value.normalize("NFKC").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function isValidDni(value: string): boolean {
+  return /^(?:\d{7,8}|[A-Z]\d{7,8})$/.test(value);
+}
+
 Deno.serve(async (request: Request) => {
   const origin = request.headers.get("origin") ?? "";
 
@@ -59,8 +67,8 @@ Deno.serve(async (request: Request) => {
   if (!isCurrentCode && !isPreviouslyIssuedCode) {
     return respond({ success: false, error: "El código ingresado no es válido." }, 400, origin);
   }
-  const suppliedDni = typeof body.dni === "string" ? body.dni.replace(/\D/g, "") : "";
-  if (action === "delete_rejected" && !/^\d{7,8}$/.test(suppliedDni)) {
+  const suppliedDni = typeof body.dni === "string" ? normalizeDni(body.dni) : "";
+  if (action === "delete_rejected" && !isValidDni(suppliedDni)) {
     return respond({ success: false, error: "Ingresá el DNI asociado a la solicitud para confirmar la eliminación." }, 400, origin);
   }
 
@@ -87,7 +95,7 @@ Deno.serve(async (request: Request) => {
       if (data.status !== "rejected") {
         return respond({ success: false, error: "La eliminación está disponible únicamente para solicitudes rechazadas." }, 409, origin);
       }
-      if (suppliedDni !== String(data.dni).replace(/\D/g, "")) {
+      if (suppliedDni !== normalizeDni(String(data.dni))) {
         return respond({ success: false, error: "No se pudo confirmar la solicitud. Revisá el DNI y el código." }, 403, origin);
       }
 

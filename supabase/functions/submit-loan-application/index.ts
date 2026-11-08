@@ -52,7 +52,20 @@ function textField(
 }
 
 function numberField(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string") return null;
+  const formatted = value.trim();
+  if (!/^\d+$/.test(formatted) && !/^\d{1,3}(?:\.\d{3})+$/.test(formatted) && !/^\d{1,3}(?:,\d{3})+$/.test(formatted)) return null;
+  const amount = Number(formatted.replace(/[.,]/g, ""));
+  return Number.isSafeInteger(amount) ? amount : null;
+}
+
+function normalizeDni(value: string): string {
+  return value.normalize("NFKC").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function isValidDni(value: string): boolean {
+  return /^(?:\d{7,8}|[A-Z]\d{7,8})$/.test(value);
 }
 
 async function createTrackingCode() {
@@ -193,8 +206,8 @@ Deno.serve(async (req: Request) => {
     return respond({ error: "Completá el nombre, el teléfono y el vínculo con quien te recomendó." }, 400, origin);
   }
 
-  const dni = dniRaw.replace(/\D/g, "");
-  if (!/^\d{7,8}$/.test(dni)) return respond({ error: "El DNI no tiene un formato válido." }, 400, origin);
+  const dni = normalizeDni(dniRaw);
+  if (!isValidDni(dni)) return respond({ error: "El DNI debe tener 7 u 8 números y puede comenzar con una letra." }, 400, origin);
   if (typeof dniUpdated !== "boolean") return respond({ error: "Indicá si el DNI está actualizado." }, 400, origin);
 
   if (loanAmount === null || !Number.isInteger(loanAmount) || loanAmount < 100_000 ||
@@ -241,7 +254,8 @@ Deno.serve(async (req: Request) => {
   if ((hasService && typeof serviceOwner !== "boolean") || (!hasService && serviceOwner !== null)) {
     return respond({ error: "Indicá correctamente quién es titular del servicio." }, 400, origin);
   }
-  if (serviceOwner === false && (!serviceHolderName || !/^\d{7,8}$/.test(serviceHolderDni.replace(/\D/g, "")) || !serviceHolderRelationship)) {
+  const normalizedServiceHolderDni = normalizeDni(serviceHolderDni);
+  if (serviceOwner === false && (!serviceHolderName || !isValidDni(normalizedServiceHolderDni) || !serviceHolderRelationship)) {
     return respond({ error: "Completá los datos del titular del servicio." }, 400, origin);
   }
   if (hasDebts && (debtAmount === null || debtAmount < 0 || !debtReason)) {
@@ -373,7 +387,7 @@ Deno.serve(async (req: Request) => {
     has_service_in_own_name: hasService ? serviceOwner === true : false,
     service_types: serviceTypes,
     service_holder_name: serviceOwner === false ? serviceHolderName : "",
-    service_holder_dni: serviceOwner === false ? serviceHolderDni.replace(/\D/g, "") : "",
+    service_holder_dni: serviceOwner === false ? normalizedServiceHolderDni : "",
     service_holder_relationship: serviceOwner === false ? serviceHolderRelationship : "",
     has_debts: hasDebts,
     debt_reason: hasDebts ? debtReason : "",
