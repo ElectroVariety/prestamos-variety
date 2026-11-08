@@ -478,7 +478,6 @@ select:focus-visible {
   gap: 12px;
 }
 
-.credit-check-notice { margin:0; padding:11px 13px; border-left:3px solid var(--brand-electric); border-radius:5px; background:var(--brand-blue-soft); color:#39485a; font-size:11px; line-height:1.55; }
 
 .privacy-choice {
   display: flex;
