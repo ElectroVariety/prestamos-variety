@@ -170,14 +170,22 @@ function Upload({
   resetKey: number
 }) {
   const [error, setError] = useState('')
-  const [selectedNames, setSelectedNames] = useState<string[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    setSelectedNames([])
+    setSelectedFiles([])
     setError('')
     if (inputRef.current) inputRef.current.value = ''
   }, [resetKey])
+
+  useEffect(() => {
+    const urls = selectedFiles.map((file) => file.type.startsWith('image/') ? URL.createObjectURL(file) : '')
+    setPreviewUrls(urls)
+    return () => urls.forEach((url) => { if (url) URL.revokeObjectURL(url) })
+  }, [selectedFiles])
+
   const maxFileSize = 5 * 1024 * 1024
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -192,42 +200,57 @@ function Upload({
     })
 
     if (invalid) {
-      setSelectedNames([])
       setError(
         invalid.size > maxFileSize
-          ? `El archivo supera el límite de ${Math.floor(maxFileSize / (1024 * 1024))} MB.`
-          : 'Formato no permitido o archivo vacío. Usá un formato admitido.',
+          ? `“${invalid.name}” supera el límite de 5 MB. Elegí otro archivo o comprimilo.`
+          : `“${invalid.name}” no se pudo aceptar. Revisá el formato y que el archivo no esté vacío.`,
       )
       event.target.value = ''
-      onFilesChange(fileKey, [])
       return
     }
 
-    setSelectedNames(selected.map((file) => file.name))
+    setSelectedFiles(selected)
     onFilesChange(fileKey, selected)
   }
 
+  const clearFiles = () => {
+    setSelectedFiles([])
+    setError('')
+    if (inputRef.current) inputRef.current.value = ''
+    onFilesChange(fileKey, [])
+  }
+
   return (
-    <label className="upload">
-      <span className="upload-icon" aria-hidden="true">＋</span>
-      <span className="upload-copy">
-        <strong>{label}{required ? ' *' : ''}</strong>
-        <small>{multiple ? 'Podés seleccionar varios archivos' : 'Elegí un archivo de tu dispositivo'}</small>
-        <small>Máximo {Math.floor(maxFileSize / (1024 * 1024))} MB por archivo.</small>
-      </span>
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        multiple={multiple}
-        required={required}
-        onChange={handleChange}
-      />
-      {selectedNames.map((name) => (
-        <small className="upload-success" key={name}>Archivo seleccionado: {name}</small>
-      ))}
+    <div className="upload-field">
+      <label className="upload">
+        <span className="upload-icon" aria-hidden="true">{selectedFiles.length ? '✓' : '＋'}</span>
+        <span className="upload-copy">
+          <strong>{label}{required ? ' *' : ''}</strong>
+          <small>{selectedFiles.length ? 'Tocá para cambiar el archivo' : multiple ? 'Podés seleccionar varios archivos' : 'Elegí un archivo de tu dispositivo'}</small>
+          <small>Máximo 5 MB por archivo.</small>
+        </span>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={accept}
+          multiple={multiple}
+          required={required && selectedFiles.length === 0}
+          onChange={handleChange}
+        />
+      </label>
+      {selectedFiles.length > 0 && (
+        <div className="upload-selected-list" aria-live="polite">
+          {selectedFiles.map((file, index) => (
+            <div className="upload-selected-file" key={`${file.name}-${file.lastModified}-${index}`}>
+              {previewUrls[index] ? <img className="upload-thumbnail" src={previewUrls[index]} alt={`Vista previa de ${file.name}`} /> : <span className="upload-file-icon" aria-hidden="true">{file.type === 'application/pdf' ? 'PDF' : file.type.startsWith('video/') ? '▶' : 'FILE'}</span>}
+              <span className="upload-file-info"><strong>{file.name}</strong><small>{(file.size / (1024 * 1024)).toFixed(2)} MB</small></span>
+            </div>
+          ))}
+          <button className="upload-clear" type="button" onClick={clearFiles}>Quitar {selectedFiles.length > 1 ? 'archivos' : 'archivo'}</button>
+        </div>
+      )}
       {error && <small role="alert" className="upload-error">{error}</small>}
-    </label>
+    </div>
   )
 }
 

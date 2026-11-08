@@ -115,6 +115,9 @@ const bcraSituationLabel: Record<number, string> = {
   5: 'Irrecuperable',
 }
 
+const APPLICATION_ROW_HEIGHT = 76
+const APPLICATION_OVERSCAN = 8
+
 function PdfField({ label, value }: { label: string; value: unknown }) {
   const text = value === null || value === undefined || value === '' ? '—' : String(value)
   return <div className="pdf-field"><small>{label}</small><b>{text}</b></div>
@@ -142,6 +145,8 @@ export default function AdminApp() {
   const [bcraCheck, setBcraCheck] = useState<{ applicationId: string; result: BcraCreditCheck } | null>(null)
   const selectedRequestId = useRef(0)
   const applicationsLoadId = useRef(0)
+  const applicationListViewportRef = useRef<HTMLDivElement>(null)
+  const [applicationListWindow, setApplicationListWindow] = useState({ scrollTop: 0, height: 520 })
   const [filter, setFilter] = useState('pending')
   const filterRef = useRef(filter)
   filterRef.current = filter
@@ -547,6 +552,29 @@ export default function AdminApp() {
       && (!onlyRecommended || application.has_referrer)
   })
 
+  const virtualStart = Math.max(0, Math.floor(applicationListWindow.scrollTop / APPLICATION_ROW_HEIGHT) - APPLICATION_OVERSCAN)
+  const virtualEnd = Math.min(
+    visibleApplications.length,
+    Math.ceil((applicationListWindow.scrollTop + applicationListWindow.height) / APPLICATION_ROW_HEIGHT) + APPLICATION_OVERSCAN,
+  )
+  const virtualApplications = visibleApplications.slice(virtualStart, virtualEnd)
+
+  useEffect(() => {
+    const viewport = applicationListViewportRef.current
+    if (!viewport) return
+    const updateHeight = () => setApplicationListWindow((current) => ({ ...current, height: viewport.clientHeight || 520 }))
+    updateHeight()
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [session])
+
+  useEffect(() => {
+    const viewport = applicationListViewportRef.current
+    if (viewport) viewport.scrollTop = 0
+    setApplicationListWindow((current) => ({ ...current, scrollTop: 0 }))
+  }, [filter, clientSearch, onlyElectroClients, onlySalaryReceipt, onlyRecommended])
+
   const toggleApplication = (id: string) => {
     setSelectedIds((current) => {
       const next = new Set(current)
@@ -804,23 +832,34 @@ export default function AdminApp() {
             {exportProgress && <p role="status">{exportProgress}</p>}
             <small>Se muestran todas las solicitudes del filtro. Para incluir archivadas, elegí “Archivadas” arriba.</small>
           </div>
-          {loading && <p className="admin-empty">Cargando…</p>}
-          {!loading && visibleApplications.length === 0 && <p className="admin-empty">No hay solicitudes que coincidan con estos filtros.</p>}
-          {visibleApplications.map((application) => (
-            <div className="application-list-item" key={application.id}>
-              <input
-                type="checkbox"
-                aria-label={`Seleccionar solicitud de ${application.full_name}`}
-                checked={selectedIds.has(application.id)}
-                onChange={() => toggleApplication(application.id)}
-              />
-              <button className={'application-row ' + (selectedId === application.id ? 'is-selected' : '')} onClick={() => void openApplication(application)}>
-                <span className={'status-dot status-' + application.status} />
-                <span className="application-summary"><b>{application.full_name}</b><small>DNI {application.dni} · {new Date(application.created_at).toLocaleDateString('es-AR')}{application.archived_at ? ' · Archivada' : ''}</small></span>
-                <strong>{money(application.loan_amount)}</strong>
-              </button>
-            </div>
-          ))}
+          <div
+            className="application-list-viewport"
+            ref={applicationListViewportRef}
+            onScroll={(event) => setApplicationListWindow((current) => ({ ...current, scrollTop: event.currentTarget.scrollTop }))}
+            aria-label="Solicitudes"
+          >
+            {loading && <p className="admin-empty">Cargando…</p>}
+            {!loading && visibleApplications.length === 0 && <p className="admin-empty">No hay solicitudes que coincidan con estos filtros.</p>}
+            {!loading && visibleApplications.length > 0 && (
+              <div className="application-list-spacer" style={{ height: visibleApplications.length * APPLICATION_ROW_HEIGHT }}>
+                {virtualApplications.map((application, index) => (
+                  <div className="application-list-item" key={application.id} style={{ top: (virtualStart + index) * APPLICATION_ROW_HEIGHT }}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Seleccionar solicitud de ${application.full_name}`}
+                      checked={selectedIds.has(application.id)}
+                      onChange={() => toggleApplication(application.id)}
+                    />
+                    <button className={'application-row ' + (selectedId === application.id ? 'is-selected' : '')} onClick={() => void openApplication(application)}>
+                      <span className={'status-dot status-' + application.status} />
+                      <span className="application-summary"><b>{application.full_name}</b><small>DNI {application.dni} · {new Date(application.created_at).toLocaleDateString('es-AR')}{application.archived_at ? ' · Archivada' : ''}</small></span>
+                      <strong>{money(application.loan_amount)}</strong>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
         <section className="application-detail" ref={applicationDetailRef}>
           {!selected ? <div className="admin-empty detail-placeholder">{detailLoading ? 'Cargando los datos de la solicitud…' : 'Elegí una solicitud para ver sus datos y documentación.'}</div> : (

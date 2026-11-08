@@ -53,9 +53,12 @@
 .whatsapp-delivery-status { display:grid; gap:9px; }
 .income-detail { padding:4px 0 10px; border-top:1px solid #f0f2f0; }
 .income-fields { padding:10px 0 0; border:0; }
-.application-list-item { display:flex; align-items:center; gap:8px; padding-left:12px; border-bottom:1px solid #edf0ed; }
+.admin-list { display:flex; flex-direction:column; height:min(760px,calc(100vh - 220px)); min-height:520px; }
+.application-list-viewport { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.application-list-spacer { position:relative; width:100%; }
+.application-list-item { position:absolute; left:0; right:0; box-sizing:border-box; display:flex; align-items:center; gap:8px; height:76px; padding-left:12px; border-bottom:1px solid #edf0ed; background:#fff; }
 .application-list-item>input { flex:none; width:17px; height:17px; accent-color:#006fc6; }
-.application-list-item .application-row { flex:1; border-bottom:0; padding-left:0; }
+.application-list-item .application-row { flex:1; height:100%; min-width:0; border-bottom:0; padding:10px 12px 10px 0; }
 .bulk-export-toolbar { display:grid; gap:9px; padding:13px; border-bottom:1px solid #edf0ed; background:#f7faff; }
 .bulk-export-toolbar>b { color:var(--brand-graphite); font-size:12px; }
 .application-search { display:grid; gap:6px; color:var(--brand-graphite); font-size:11px; font-weight:700; }
@@ -153,3 +156,4 @@
 .bcra-entity span { color:#5e6978; }
 .bcra-error { margin:12px 0 0!important; }
 .detail-subsection > .bcra-error { color:#9c3030; font-size:13px; }
+@media(max-width:760px){.admin-list{height:min(520px,70vh);min-height:320px;max-height:none;overflow:hidden}}

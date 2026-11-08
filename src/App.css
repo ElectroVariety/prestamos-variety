@@ -392,6 +392,18 @@ select:focus-visible {
   white-space: nowrap;
 }
 
+.upload-field { display:grid; gap:7px; min-width:0; }
+.upload-field .upload { min-height:64px; box-sizing:border-box; }
+.upload-selected-list { display:grid; gap:6px; min-width:0; }
+.upload-selected-file { display:flex; align-items:center; gap:9px; min-width:0; padding:7px 9px; border:1px solid #dce9df; border-radius:8px; background:#f7fbf8; }
+.upload-thumbnail { width:52px; height:42px; flex:none; border-radius:5px; object-fit:cover; background:#e8eef0; }
+.upload-file-icon { display:grid; place-items:center; width:52px; height:42px; flex:none; border-radius:5px; background:#e8f3eb; color:var(--green); font-size:11px; font-weight:800; }
+.upload-file-info { display:grid; gap:3px; min-width:0; }
+.upload-file-info strong { overflow:hidden; color:#304338; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.upload-file-info small { color:var(--muted); font-size:10px; }
+.upload-clear { justify-self:start; padding:4px 2px; border:0; background:transparent; color:#9a3434; font:inherit; font-size:11px; text-decoration:underline; cursor:pointer; }
+.upload-error { display:block; padding:8px 10px; border:1px solid #efcaca; border-radius:7px; background:#fff5f5; color:#a12f2f; font-size:11px; line-height:1.45; }
+
 .conditional-panel {
   display: grid;
   gap: 16px;
