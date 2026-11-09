@@ -156,13 +156,4 @@
 .bcra-entity span { color:#5e6978; }
 .bcra-error { margin:12px 0 0!important; }
 .detail-subsection > .bcra-error { color:#9c3030; font-size:13px; }
-.zone-check { display:grid; justify-items:start; gap:8px; margin-top:14px; }
-.zone-check-button { min-height:40px; border:1px solid #b8c3d1; border-radius:9px; padding:9px 14px; background:#fff; color:#005da8; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
-.zone-check-button:hover { border-color:#008fff; background:#f4f9ff; }
-.zone-check-button:disabled { opacity:.6; cursor:wait; }
-.zone-check>small,.zone-check-result small { color:#5e6978; font-size:11px; line-height:1.5; }
-.zone-check-error { margin:0!important; color:#9c3030; font-size:13px; }
-.zone-check-result { display:grid; gap:5px; width:100%; box-sizing:border-box; padding:12px; border:1px solid #b8c3d1; border-radius:10px; background:#f4f7fa; color:#252b35; font-size:12px; overflow-wrap:anywhere; }
-.zone-check-result.is-inside { border-color:#e8a4a4; background:#fff4f3; }
-.zone-check-result.is-outside { border-color:#a9d4b6; background:#f3faf5; }
 @media(max-width:760px){.admin-list{height:min(520px,70vh);min-height:320px;max-height:none;overflow:hidden}}

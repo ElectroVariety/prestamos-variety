@@ -45,19 +45,6 @@ type BcraCreditCheck = {
   }>
 }
 
-type AddressZoneCheck = {
-  address: string
-  locality: string
-  normalized_address: string
-  latitude: number
-  longitude: number
-  inside_red_zone: boolean
-  matching_polygons: number
-  approximate: true
-  queried_at: string
-  source: string
-}
-
 const money = (amount: unknown) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Number(amount) || 0)
 
@@ -156,9 +143,6 @@ export default function AdminApp() {
   const [bcraLoading, setBcraLoading] = useState(false)
   const [bcraError, setBcraError] = useState('')
   const [bcraCheck, setBcraCheck] = useState<{ applicationId: string; result: BcraCreditCheck } | null>(null)
-  const [zoneLoading, setZoneLoading] = useState(false)
-  const [zoneError, setZoneError] = useState('')
-  const [zoneCheck, setZoneCheck] = useState<{ applicationId: string; result: AddressZoneCheck } | null>(null)
   const selectedRequestId = useRef(0)
   const applicationsLoadId = useRef(0)
   const applicationListViewportRef = useRef<HTMLDivElement>(null)
@@ -199,8 +183,6 @@ export default function AdminApp() {
     setError('')
     setBcraError('')
     setBcraCheck(null)
-    setZoneError('')
-    setZoneCheck(null)
     try {
       const data = await callAdmin({ action: 'detail', application_id: application.id })
       if (requestId === selectedRequestId.current) setSelected(data.application as Application)
@@ -257,21 +239,6 @@ export default function AdminApp() {
       setBcraError(cause instanceof Error ? cause.message : 'No se pudo consultar la Central de Deudores.')
     } finally {
       setBcraLoading(false)
-    }
-  }
-
-  const checkRedZone = async () => {
-    if (!selected || zoneLoading) return
-    setZoneLoading(true)
-    setZoneError('')
-    setZoneCheck(null)
-    try {
-      const data = await callAdmin({ action: 'check_red_zone', application_id: selected.id })
-      setZoneCheck({ applicationId: selected.id, result: data.zone_check as AddressZoneCheck })
-    } catch (cause) {
-      setZoneError(cause instanceof Error ? cause.message : 'No se pudo consultar el domicilio en el mapa.')
-    } finally {
-      setZoneLoading(false)
     }
   }
 
@@ -997,20 +964,6 @@ export default function AdminApp() {
                   <div><small>Entre calles</small><b>{selected.between_streets || '—'}</b></div>
                   <div><small>Localidad</small><b>{selected.locality}</b></div>
                   <div><small>Situación de vivienda</small><b>{housingLabels[selected.housing_type] || selected.housing_type || '—'}</b></div>
-                </div>
-                <div className="zone-check">
-                  <button className="zone-check-button" onClick={() => void checkRedZone()} disabled={zoneLoading}>
-                    {zoneLoading ? 'Consultando ubicación…' : 'Consultar zona en el mapa'}
-                  </button>
-                  <small>La dirección se envía a Georef para estimar un punto aproximado. El resultado es orientativo y no decide por sí solo la aprobación.</small>
-                  {zoneError && <p className="zone-check-error" role="alert">{zoneError}</p>}
-                  {zoneCheck?.applicationId === selected.id && <div className={'zone-check-result ' + (zoneCheck.result.inside_red_zone ? 'is-inside' : 'is-outside')}>
-                    <b>{zoneCheck.result.inside_red_zone ? 'El punto aproximado está dentro de una zona roja del mapa' : 'El punto aproximado está fuera de las zonas rojas del mapa'}</b>
-                    <span>{zoneCheck.result.normalized_address}</span>
-                    <span>Coordenadas aproximadas: {zoneCheck.result.latitude.toFixed(6)}, {zoneCheck.result.longitude.toFixed(6)}</span>
-                    {zoneCheck.result.inside_red_zone && <span>Polígonos coincidentes: {zoneCheck.result.matching_polygons}</span>}
-                    <small>Coordenadas de <a href="https://www.argentina.gob.ar/georef" target="_blank" rel="noreferrer">Georef Argentina</a> · Consultado {formatDateTime(zoneCheck.result.queried_at)}</small>
-                  </div>}
                 </div>
               </div>
               <div className="detail-subsection">
