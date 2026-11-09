@@ -22,6 +22,116 @@ type LoanPlan = {
   amount: number
 }
 
+type GeoSuggestion = { id: string; label: string; detail: string }
+
+type PickedLocality = { id: string; name: string }
+type PickedStreet = { id: string; name: string }
+
+async function fetchGeorefSuggestions(resource: 'localidades' | 'calles', query: string, parentId: string | null, signal: AbortSignal): Promise<GeoSuggestion[]> {
+  const url = new URL(`https://apis.datos.gob.ar/georef/api/v2.0/${resource}`)
+  url.searchParams.set(resource === 'localidades' ? 'nombre' : 'nombre', query)
+  url.searchParams.set('max', '8')
+  if (resource === 'calles' && parentId) url.searchParams.set('localidad', parentId)
+  const response = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+  if (!response.ok) throw new Error(response.status === 429 ? 'Georef está recibiendo muchas consultas. Probá nuevamente en unos segundos.' : 'No se pudieron cargar las sugerencias de ubicación.')
+  const body = await response.json() as Record<string, unknown>
+  const entries = Array.isArray(body[resource]) ? body[resource] as Array<Record<string, unknown>> : []
+  return entries.flatMap((entry): GeoSuggestion[] => {
+    if (typeof entry.id !== 'string' || typeof entry.nombre !== 'string') return []
+    const province = entry.provincia && typeof entry.provincia === 'object' ? (entry.provincia as Record<string, unknown>).nombre : null
+    const department = entry.departamento && typeof entry.departamento === 'object' ? (entry.departamento as Record<string, unknown>).nombre : null
+    return [{
+      id: entry.id,
+      label: entry.nombre,
+      detail: resource === 'localidades'
+        ? [department, province].filter((item): item is string => typeof item === 'string').join(' · ')
+        : (typeof entry.nomenclatura === 'string' ? entry.nomenclatura : [entry.categoria, province].filter((item): item is string => typeof item === 'string').join(' · ')),
+    }]
+  })
+}
+
+function GeoPredictiveInput({
+  id, value, options, disabled, loading, error, placeholder, onChange, onSelect, onUseTyped,
+}: {
+  id: string
+  value: string
+  options: GeoSuggestion[]
+  disabled?: boolean
+  loading: boolean
+  error: string
+  placeholder: string
+  onChange: (value: string) => void
+  onSelect: (option: GeoSuggestion) => void
+  onUseTyped: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const listId = `${id}-suggestions`
+  const canSuggest = !disabled && value.trim().length >= 3
+  const optionCount = options.length + 1
+  return (
+    <div className="geo-predictive">
+      <input
+        id={id}
+        type="text"
+        value={value}
+        required
+        disabled={disabled}
+        placeholder={placeholder}
+        autoComplete="off"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={open && canSuggest}
+        aria-controls={listId}
+        aria-activedescendant={open && canSuggest ? `${listId}-${activeIndex}` : undefined}
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 100)}
+        onChange={(event) => { onChange(event.target.value); setOpen(true); setActiveIndex(0) }}
+        onKeyDown={(event) => {
+          if (!open || !canSuggest) return
+          if (event.key === 'ArrowDown') { event.preventDefault(); setActiveIndex((index) => (index + 1) % optionCount) }
+          if (event.key === 'ArrowUp') { event.preventDefault(); setActiveIndex((index) => (index + optionCount - 1) % optionCount) }
+          if (event.key === 'Escape') setOpen(false)
+          if (event.key === 'Enter' && activeIndex === options.length) { event.preventDefault(); onUseTyped(); setOpen(false) }
+          if (event.key === 'Enter' && options[activeIndex]) { event.preventDefault(); onSelect(options[activeIndex]); setOpen(false) }
+        }}
+      />
+      {open && canSuggest && (
+        <div id={listId} className="geo-suggestions" role="listbox">
+          {loading && <div className="geo-suggestion-status">Buscando sugerencias…</div>}
+          {!loading && error && <div className="geo-suggestion-status geo-suggestion-error">{error}</div>}
+          {!loading && !error && options.length === 0 && <div className="geo-suggestion-status">No encontramos coincidencias oficiales.</div>}
+          {!loading && options.map((option, index) => (
+            <button
+              id={`${listId}-${index}`}
+              className="geo-suggestion-option"
+              type="button"
+              role="option"
+              aria-selected={activeIndex === index}
+              key={option.id}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => { onSelect(option); setOpen(false) }}
+            >
+              <b>{option.label}</b>{option.detail && <small>{option.detail}</small>}
+            </button>
+          ))}
+          <button
+            id={`${listId}-${options.length}`}
+            className="geo-suggestion-manual"
+            type="button"
+            role="option"
+            aria-selected={activeIndex === options.length}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => { onUseTyped(); setOpen(false) }}
+          >
+            Usar “{value.trim()}” como está escrito
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const loanPlans: Record<number, Record<LoanFrequency, LoanPlan>> = {
   100000: {
     weekly: { installments: 20, amount: 12000 },
@@ -149,6 +259,15 @@ function Field({
       </span>
       {children}
     </label>
+  )
+}
+
+function GeoField({ label, inputId, children }: { label: string; inputId: string; children: ReactNode }) {
+  return (
+    <div className="field">
+      <label className="field-label" htmlFor={inputId}>{label}<span className="required"> *</span></label>
+      {children}
+    </div>
   )
 }
 
@@ -285,6 +404,17 @@ function App() {
   const galleryInteractionPauseUntilRef = useRef(0)
   const [selectedDeliveryPhoto, setSelectedDeliveryPhoto] = useState<string | null>(null)
   const [rememberedTrackingCode, setRememberedTrackingCode] = useState<string | null>(() => readRememberedTrackingCode())
+  const [localityQuery, setLocalityQuery] = useState('')
+  const [selectedLocality, setSelectedLocality] = useState<PickedLocality | null>(null)
+  const [localitySuggestions, setLocalitySuggestions] = useState<GeoSuggestion[]>([])
+  const [localityLoading, setLocalityLoading] = useState(false)
+  const [localityLookupError, setLocalityLookupError] = useState('')
+  const [streetQuery, setStreetQuery] = useState('')
+  const [selectedStreet, setSelectedStreet] = useState<PickedStreet | null>(null)
+  const [streetNumber, setStreetNumber] = useState('')
+  const [streetSuggestions, setStreetSuggestions] = useState<GeoSuggestion[]>([])
+  const [streetLoading, setStreetLoading] = useState(false)
+  const [streetLookupError, setStreetLookupError] = useState('')
   const [housing, setHousing] = useState('')
   const [referrerStatus, setReferrerStatus] = useState('')
   const [electroVarietyClientStatus, setElectroVarietyClientStatus] = useState('')
@@ -307,6 +437,55 @@ function App() {
   const [trackingCodeCopied, setTrackingCodeCopied] = useState(false)
 
   const selectedPlan = loanPlans[loanAmount][loanFrequency]
+
+  useEffect(() => {
+    const query = localityQuery.trim()
+    if (query.length < 3 || selectedLocality?.name === query) {
+      setLocalitySuggestions([])
+      setLocalityLoading(false)
+      setLocalityLookupError('')
+      return
+    }
+    const controller = new AbortController()
+    setLocalityLoading(true)
+    setLocalityLookupError('')
+    const timer = window.setTimeout(() => {
+      void fetchGeorefSuggestions('localidades', query, null, controller.signal)
+        .then(setLocalitySuggestions)
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === 'AbortError') return
+          setLocalitySuggestions([])
+          setLocalityLookupError(error instanceof Error ? error.message : 'No se pudieron cargar las sugerencias de localidad.')
+        })
+        .finally(() => { if (!controller.signal.aborted) setLocalityLoading(false) })
+    }, 350)
+    return () => { window.clearTimeout(timer); controller.abort() }
+  }, [localityQuery, selectedLocality])
+
+  useEffect(() => {
+    const query = streetQuery.trim()
+    if (!selectedLocality || query.length < 3 || selectedStreet?.name === query) {
+      setStreetSuggestions([])
+      setStreetLoading(false)
+      setStreetLookupError('')
+      return
+    }
+    const controller = new AbortController()
+    setStreetLoading(true)
+    setStreetLookupError('')
+    const localityId = selectedLocality.id === 'manual' ? selectedLocality.name : selectedLocality.id
+    const timer = window.setTimeout(() => {
+      void fetchGeorefSuggestions('calles', query, localityId, controller.signal)
+        .then(setStreetSuggestions)
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === 'AbortError') return
+          setStreetSuggestions([])
+          setStreetLookupError(error instanceof Error ? error.message : 'No se pudieron cargar las sugerencias de calles.')
+        })
+        .finally(() => { if (!controller.signal.aborted) setStreetLoading(false) })
+    }, 350)
+    return () => { window.clearTimeout(timer); controller.abort() }
+  }, [streetQuery, selectedLocality, selectedStreet])
 
   useEffect(() => {
     const gallery = deliveryGalleryRef.current
@@ -392,6 +571,21 @@ function App() {
 
     const form = event.currentTarget
     if (!form.reportValidity()) return
+    if (!selectedLocality) {
+      setSubmitError('Elegí una localidad de las sugerencias o confirmá el texto escrito manualmente.')
+      document.getElementById('application-locality')?.focus()
+      return
+    }
+    if (!selectedStreet) {
+      setSubmitError('Elegí una calle de las sugerencias o confirmá el texto escrito manualmente.')
+      document.getElementById('application-street')?.focus()
+      return
+    }
+    if (!streetNumber || Number(streetNumber) < 1) {
+      setSubmitError('Ingresá la altura del domicilio.')
+      document.getElementById('application-street-number')?.focus()
+      return
+    }
     if (!privacyAccepted) {
       setSubmitError('Debés aceptar la declaración de privacidad para continuar.')
       return
@@ -549,6 +743,13 @@ function App() {
       setSelectedFiles({})
       setUploadResetKey((current) => current + 1)
       setHousing('')
+      setLocalityQuery('')
+      setSelectedLocality(null)
+      setLocalitySuggestions([])
+      setStreetQuery('')
+      setSelectedStreet(null)
+      setStreetNumber('')
+      setStreetSuggestions([])
       setReferrerStatus('')
       setElectroVarietyClientStatus('')
       setServiceOwner('')
@@ -773,18 +974,70 @@ function App() {
 
         <Section number="02" title="Domicilio">
           <div className="form-grid">
-            <Field label="Calle y número">
-              <input name="address" autoComplete="street-address" required />
+            <GeoField label="Localidad" inputId="application-locality">
+              <GeoPredictiveInput
+                id="application-locality"
+                value={localityQuery}
+                options={localitySuggestions}
+                loading={localityLoading}
+                error={localityLookupError}
+                placeholder="Empezá a escribir tu localidad"
+                onChange={(value) => {
+                  setLocalityQuery(value)
+                  setSelectedLocality(null)
+                  setStreetQuery('')
+                  setSelectedStreet(null)
+                  setStreetNumber('')
+                }}
+                onSelect={(option) => {
+                  setLocalityQuery(option.label)
+                  setSelectedLocality({ id: option.id, name: option.label })
+                  setStreetQuery('')
+                  setSelectedStreet(null)
+                  setStreetNumber('')
+                }}
+                onUseTyped={() => setSelectedLocality({ id: 'manual', name: localityQuery.trim() })}
+              />
+            </GeoField>
+            <GeoField label="Calle" inputId="application-street">
+              <GeoPredictiveInput
+                id="application-street"
+                value={streetQuery}
+                options={streetSuggestions}
+                loading={streetLoading}
+                error={streetLookupError}
+                disabled={!selectedLocality}
+                placeholder={selectedLocality ? 'Empezá a escribir la calle' : 'Primero elegí la localidad'}
+                onChange={(value) => { setStreetQuery(value); setSelectedStreet(null); setStreetNumber('') }}
+                onSelect={(option) => {
+                  setStreetQuery(option.label)
+                  setSelectedStreet({ id: option.id, name: option.label })
+                  setStreetNumber('')
+                }}
+                onUseTyped={() => setSelectedStreet({ id: 'manual', name: streetQuery.trim() })}
+              />
+            </GeoField>
+            <Field label="Altura del domicilio">
+              <input
+                id="application-street-number"
+                type="number"
+                min="1"
+                max="999999"
+                step="1"
+                inputMode="numeric"
+                placeholder="Ej.: 1234"
+                value={streetNumber}
+                onChange={(event) => setStreetNumber(event.target.value)}
+                required
+              />
             </Field>
-
             <Field label="Entre calles">
               <input name="between_streets" required />
             </Field>
-
-            <Field label="Localidad">
-              <input name="locality" required />
-            </Field>
           </div>
+          <input type="hidden" name="locality" value={selectedLocality?.name ?? ''} />
+          <input type="hidden" name="address" value={selectedStreet && streetNumber ? `${selectedStreet.name} ${streetNumber}` : ''} />
+          <small className="georef-attribution">Sugerencias de ubicación por <a href="https://www.argentina.gob.ar/georef" target="_blank" rel="noreferrer">Servicio Georef</a>. Podés ingresar los datos manualmente si no aparece una sugerencia.</small>
 
           <Field label="¿Cuál es tu situación de vivienda?">
             <div className="choice-list">

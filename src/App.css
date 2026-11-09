@@ -260,6 +260,19 @@ select:focus-visible {
   resize: vertical;
 }
 
+.geo-predictive { position:relative; min-width:0; }
+.geo-predictive>input { box-sizing:border-box; }
+.geo-suggestions { position:absolute; z-index:30; top:calc(100% + 5px); left:0; right:0; max-height:250px; overflow-y:auto; border:1px solid var(--brand-silver); border-radius:10px; background:#fff; box-shadow:0 12px 28px #252b3526; }
+.geo-suggestion-option,.geo-suggestion-manual { display:grid; width:100%; gap:3px; padding:10px 12px; border:0; border-bottom:1px solid #edf0f3; background:#fff; color:var(--brand-graphite); text-align:left; cursor:pointer; }
+.geo-suggestion-option:hover,.geo-suggestion-option[aria-selected="true"],.geo-suggestion-manual:hover,.geo-suggestion-manual[aria-selected="true"] { background:#e7f3ff; }
+.geo-suggestion-option b { font-size:13px; }
+.geo-suggestion-option small,.geo-suggestion-status { color:#5e6978; font-size:11px; }
+.geo-suggestion-status { padding:11px 12px; }
+.geo-suggestion-error { color:#9c3030; }
+.geo-suggestion-manual { border-bottom:0; color:#005da8; font-size:12px; font-weight:700; }
+.georef-attribution { display:block; margin-top:12px; color:#5e6978; font-size:11px; line-height:1.5; }
+.georef-attribution a { color:#005da8; }
+
 .choice-list,
 .choice-grid {
   display: grid;
